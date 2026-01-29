@@ -1,0 +1,219 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject UserSessionService Session
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<style>
+    .plan-status-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+    }
+
+    .plan-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.375rem 0.75rem;
+        border-radius: 8px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+        color: var(--primary-500, #3b82f6);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+
+        .plan-pill.unlimited {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%);
+            color: #10b981;
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .plan-pill.free {
+            background: linear-gradient(135deg, rgba(107, 114, 128, 0.1) 0%, rgba(75, 85, 99, 0.1) 100%);
+            color: #6b7280;
+            border-color: rgba(107, 114, 128, 0.2);
+        }
+
+        .plan-pill.pro {
+            background: linear-gradient(135deg, rgba(234, 179, 8, 0.15) 0%, rgba(202, 138, 4, 0.15) 100%);
+            color: #ca8a04;
+            border-color: rgba(234, 179, 8, 0.3);
+        }
+
+        .plan-pill.basic {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.15) 100%);
+            color: #2563eb;
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+</style>
+
+<div class="plan-status-bar"
+     @onclick="Refresh"
+     title="Plan status (click to refresh)"
+     data-testid="plan-status-bar">
+
+    @if (_loading)
+    {
+        <span class="plan-pill">Plan: …</span>
+    }
+    else if (_status is null)
+    {
+        <span class="plan-pill free">Plan: <b>FREE</b></span>
+        <span class="plan-pill">
+            Credits: <b>@Format(Session.GetUser()?.Credits)</b>
+        </span>
+    }
+    else
+    {
+        var plan = NormalizePlanName(_status.PlanName);
+
+        if (_status.HasActivePlan && plan != "FREE")
+        {
+            <span class="plan-pill @GetPlanClass(plan)">
+                Plan: <b>@plan</b>
+            </span>
+
+            if (_status.IsUnlimited || plan == "UNLIMITED")
+            {
+                <span class="plan-pill unlimited">Unlimited</span>
+            }
+            else
+            {
+                <span class="plan-pill">
+                    Credits: <b>@Format(_status.WalletCredits)</b>
+                </span>
+            }
+        }
+        else
+        {
+            <span class="plan-pill free">Plan: <b>FREE</b></span>
+            <span class="plan-pill">
+                Credits: <b>@Format(_status.WalletCredits)</b>
+            </span>
+        }
+    }
+</div>
+
+@code {
+    private LittleHelperAI.Shared.Models.PlanStatusDto? _status;
+    private bool _loading;
+    private System.Timers.Timer? _refreshTimer;
+    private bool _disposed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+
+        Navigation.LocationChanged += OnLocationChanged;
+        Session.OnCreditsChanged += OnCreditsChanged;
+        Session.OnPlanChanged += OnPlanChanged;
+
+        _refreshTimer = new System.Timers.Timer(10000)
+        {
+            AutoReset = true,
+            Enabled = true
+        };
+        _refreshTimer.Elapsed += (_, _) => _ = InvokeAsync(async () =>
+        {
+            if (_disposed) return;
+            await ReloadAsync();
+        });
+    }
+
+    private void OnCreditsChanged() => _ = InvokeAsync(ReloadAsync);
+    private void OnPlanChanged() => _ = InvokeAsync(ReloadAsync);
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+        => _ = InvokeAsync(ReloadAsync);
+
+    private async Task ReloadAsync()
+    {
+        if (_disposed) return;
+
+        try
+        {
+            await LoadAsync();
+        }
+        catch
+        {
+            _status = null;
+        }
+
+        if (!_disposed)
+            await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadAsync()
+    {
+        var u = Session.GetUser();
+        if (u is null || u.Id <= 0)
+            return;
+
+        _loading = true;
+        try
+        {
+            _status = await Http.GetFromJsonAsync<LittleHelperAI.Shared.Models.PlanStatusDto>(
+                $"api/plans/status/{u.Id}");
+        }
+        catch
+        {
+            _status = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Refresh()
+        => await ReloadAsync();
+
+    private static string Format(double? v)
+        => v.HasValue ? $"{v.Value:0.##}" : "0";
+
+    private static string NormalizePlanName(string? planName)
+    {
+        if (string.IsNullOrWhiteSpace(planName))
+            return "FREE";
+
+        var p = planName.Trim().ToUpperInvariant();
+
+        // Normalize to ONLY these tiers
+        if (p.Contains("UNLIMITED")) return "UNLIMITED";
+        if (p.Contains("PRO")) return "PRO";
+        if (p.Contains("BASIC")) return "BASIC";
+        
+        // If it's anything else but contains FREE or is unknown, it's FREE
+        return "FREE";
+    }
+
+    private static string GetPlanClass(string plan)
+        => plan switch
+        {
+            "FREE" => "free",
+            "BASIC" => "basic",
+            "PRO" => "pro",
+            "UNLIMITED" => "unlimited",
+            _ => ""
+        };
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        Navigation.LocationChanged -= OnLocationChanged;
+        Session.OnCreditsChanged -= OnCreditsChanged;
+        Session.OnPlanChanged -= OnPlanChanged;
+
+        if (_refreshTimer is not null)
+        {
+            _refreshTimer.Stop();
+            _refreshTimer.Dispose();
+            _refreshTimer = null;
+        }
+    }
+}

@@ -1,0 +1,370 @@
+@page "/admin/knowledge"
+@inject HttpClient Http
+@inject UserSessionService Session
+@inject NavigationManager Nav
+
+<div class="admin-grid">
+    <div class="admin-card admin-card-wide">
+        <div class="admin-card-title">Knowledge Entries</div>
+        <div class="admin-card-sub">Manage dictionary entries for the AI assistant.</div>
+
+        @if (!_ready)
+        {
+            <div class="admin-muted" style="margin-top:12px;">Loading...</div>
+        }
+        else if (!_isAdmin)
+        {
+            <div class="admin-error" style="margin-top:12px;">You must be an admin to view this page.</div>
+        }
+        else
+        {
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-top:12px;">
+                <div class="admin-form-field" style="min-width:260px; flex:1;">
+                    <label>Search (key, category, aliases, answer)</label>
+                    <input @bind="Query" @bind:event="oninput" placeholder="Search entries..." />
+                </div>
+                <button class="admin-btn admin-btn-primary" @onclick="Reload">Search</button>
+                <button class="admin-btn" @onclick="NewEntry">New Entry</button>
+            </div>
+
+            @if (Entries.Count == 0)
+            {
+                <div class="admin-muted" style="margin-top:12px;">No entries found.</div>
+            }
+            else
+            {
+                <div class="admin-table-wrap" style="margin-top:12px;">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th style="width:140px;">Key</th>
+                                <th style="width:110px;">Category</th>
+                                <th>Answer</th>
+                                <th style="width:80px;">Conf.</th>
+                                <th style="width:70px;">Used</th>
+                                <th style="width:160px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var e in Entries)
+                            {
+                                <tr>
+                                    <td style="font-weight:700;">@e.Key</td>
+                                    <td><span class="pill">📂 @e.Category</span></td>
+                                    <td style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="@e.Answer">@Trim(e.Answer, 80)</td>
+                                    <td><strong>@e.Confidence.ToString("0.00")</strong></td>
+                                    <td>@e.TimesUsed</td>
+                                    <td>
+                                        <div style="display:flex; gap:6px;">
+                                            <button class="admin-btn admin-btn-xs admin-btn-primary" @onclick="() => EditEntry(e)" title="Edit entry">✏️ Edit</button>
+                                            <button class="admin-btn admin-btn-xs admin-btn-danger" @onclick="() => DeleteEntry(e.Id)" title="Delete entry">🗑️ Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                @if (Total > Take + Skip)
+                {
+                    <button class="admin-btn admin-btn-primary" style="margin-top:12px;" @onclick="LoadMore">📄 Load More</button>
+                }
+            }
+
+            @if (!string.IsNullOrWhiteSpace(Status))
+            {
+                <div class="admin-muted" style="margin-top:12px;">@Status</div>
+            }
+        }
+    </div>
+
+    <div class="admin-card">
+        <div class="admin-card-title">@(Editing.Id == 0 ? "New Entry" : "Edit Entry")</div>
+        <div class="admin-card-sub">Add or modify knowledge dictionary entries.</div>
+
+        <div class="admin-form-field" style="margin-top:12px;">
+            <label>Key</label>
+            <input @bind="Editing.Key" />
+        </div>
+
+        <div class="admin-form-field" style="margin-top:12px;">
+            <label>Category</label>
+            <input @bind="Editing.Category" />
+        </div>
+
+        <div class="admin-form-field" style="margin-top:12px;">
+            <label>Aliases (comma-separated)</label>
+            <input @bind="Editing.Aliases" />
+        </div>
+
+        <div class="admin-form-field" style="margin-top:12px;">
+            <label>Confidence (0-1)</label>
+            <input type="number" step="0.01" min="0" max="1" @bind="Editing.Confidence" />
+        </div>
+
+        <div class="admin-form-field" style="margin-top:12px;">
+            <label>Answer</label>
+            <textarea rows="6" @bind="Editing.Answer" style="white-space:pre-wrap;"></textarea>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:12px;">
+            <button class="admin-btn admin-btn-primary" @onclick="SaveEntry">Save</button>
+            <button class="admin-btn" @onclick="NewEntry">Clear</button>
+        </div>
+    </div>
+</div>
+
+@if (_isAdmin)
+{
+    <div class="admin-grid" style="margin-top:20px;">
+        <div class="admin-card admin-card-wide">
+            <div class="admin-card-title">Learned Knowledge</div>
+            <div class="admin-card-sub">Auto-generated knowledge from conversations.</div>
+
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-top:12px;">
+                <div class="admin-form-field" style="min-width:260px; flex:1;">
+                    <label>Search learned entries</label>
+                    <input @bind="LearnedQuery" @bind:event="oninput" placeholder="Search..." />
+                </div>
+                <button class="admin-btn" @onclick="ReloadLearned">Search</button>
+            </div>
+
+            @if (Learned.Count == 0)
+            {
+                <div class="admin-muted" style="margin-top:12px;">No learned items yet.</div>
+            }
+            else
+            {
+                <div class="admin-table-wrap" style="margin-top:12px;">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Question</th>
+                                <th>Answer</th>
+                                <th style="width:80px;">Conf.</th>
+                                <th style="width:70px;">Used</th>
+                                <th style="width:80px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var l in Learned)
+                            {
+                                <tr>
+                                    <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">@Trim(l.Question, 60)</td>
+                                    <td style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">@Trim(l.Answer, 80)</td>
+                                    <td>@l.Confidence.ToString("0.00")</td>
+                                    <td>@l.TimesUsed</td>
+                                    <td>
+                                        <button class="admin-btn admin-btn-xs admin-btn-danger" @onclick="() => DeleteLearned(l.Id)">Delete</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                @if (LearnedTotal > LearnedTake + LearnedSkip)
+                {
+                    <button class="admin-btn" style="margin-top:12px;" @onclick="LoadMoreLearned">Load More</button>
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private bool _ready;
+    private bool _isAdmin;
+
+    private string Query = "";
+    private int Take = 20;
+    private int Skip;
+    private int Total;
+
+    private List<LittleHelperAI.Shared.Models.KnowledgeEntry> Entries = new();
+    private LittleHelperAI.Shared.Models.KnowledgeEntry Editing = new();
+
+    private string Status = "";
+
+    private string LearnedQuery = "";
+    private int LearnedTake = 20;
+    private int LearnedSkip;
+    private int LearnedTotal;
+    private List<LittleHelperAI.Shared.Models.LearnedKnowledge> Learned = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.InitializeAsync();
+
+        _isAdmin = string.Equals(
+            Session.GetUser()?.Role,
+            "admin",
+            StringComparison.OrdinalIgnoreCase);
+
+        _ready = true;
+
+        if (_isAdmin)
+        {
+            await Reload();
+            await ReloadLearned();
+        }
+    }
+
+    private async Task Reload()
+    {
+        Skip = 0;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        Status = "";
+
+        var url =
+            $"/api/admin/knowledge/entries" +
+            $"?q={Uri.EscapeDataString(Query ?? "")}" +
+            $"&take={Take}&skip={Skip}";
+
+        var http = await Http.GetAsync(url);
+
+        if (http.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            Status = "Access denied.";
+            Entries.Clear();
+            return;
+        }
+
+        http.EnsureSuccessStatusCode();
+
+        var resp =
+            await http.Content.ReadFromJsonAsync<
+                ApiListResponse<LittleHelperAI.Shared.Models.KnowledgeEntry>>();
+
+        Entries = resp?.Items ?? new();
+        Total = resp?.Total ?? 0;
+    }
+
+    private async Task LoadMore()
+    {
+        Skip += Take;
+        await Load();
+    }
+
+    private void NewEntry()
+    {
+        Editing = new LittleHelperAI.Shared.Models.KnowledgeEntry
+        {
+            Confidence = 0.7,
+            Source = "manual",
+            Category = "general"
+        };
+
+        Status = "";
+    }
+
+    private void EditEntry(LittleHelperAI.Shared.Models.KnowledgeEntry e)
+    {
+        Editing = new LittleHelperAI.Shared.Models.KnowledgeEntry
+        {
+            Id = e.Id,
+            Key = e.Key,
+            Category = e.Category,
+            Aliases = e.Aliases,
+            Answer = e.Answer,
+            Confidence = e.Confidence,
+            Source = e.Source
+        };
+
+        Status = "";
+    }
+
+    private async Task SaveEntry()
+    {
+        var resp =
+            await Http.PostAsJsonAsync(
+                "/api/admin/knowledge/entries",
+                Editing);
+
+        Status = resp.IsSuccessStatusCode
+            ? "Saved."
+            : "Save failed.";
+
+        if (resp.IsSuccessStatusCode)
+            await Reload();
+    }
+
+    private async Task DeleteEntry(int id)
+    {
+        var resp =
+            await Http.DeleteAsync(
+                $"/api/admin/knowledge/entries/{id}");
+
+        Status = resp.IsSuccessStatusCode
+            ? "Deleted."
+            : "Delete failed.";
+
+        if (resp.IsSuccessStatusCode)
+            await Reload();
+    }
+
+    private async Task ReloadLearned()
+    {
+        LearnedSkip = 0;
+        await LoadLearned();
+    }
+
+    private async Task LoadLearned()
+    {
+        var url =
+            $"/api/admin/knowledge/learned" +
+            $"?q={Uri.EscapeDataString(LearnedQuery ?? "")}" +
+            $"&take={LearnedTake}&skip={LearnedSkip}";
+
+        var http = await Http.GetAsync(url);
+
+        if (http.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            Learned.Clear();
+            return;
+        }
+
+        http.EnsureSuccessStatusCode();
+
+        var resp =
+            await http.Content.ReadFromJsonAsync<
+                ApiListResponse<LittleHelperAI.Shared.Models.LearnedKnowledge>>();
+
+        Learned = resp?.Items ?? new();
+        LearnedTotal = resp?.Total ?? 0;
+    }
+
+    private async Task LoadMoreLearned()
+    {
+        LearnedSkip += LearnedTake;
+        await LoadLearned();
+    }
+
+    private async Task DeleteLearned(int id)
+    {
+        var resp =
+            await Http.DeleteAsync(
+                $"/api/admin/knowledge/learned/{id}");
+
+        if (resp.IsSuccessStatusCode)
+            await ReloadLearned();
+    }
+
+    private static string Trim(string s, int max)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "";
+        s = s.Trim();
+        return s.Length <= max ? s : s[..max] + "...";
+    }
+
+    private sealed class ApiListResponse<T>
+    {
+        public int Total { get; set; }
+        public List<T> Items { get; set; } = new();
+    }
+}

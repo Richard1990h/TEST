@@ -1,0 +1,86 @@
+/* Global Minimal Styles for LittleHelperAI */
+:root {
+    --primary-color: #2563eb;
+    --bg-color: #f8fafc;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    margin: 0;
+    padding: 0;
+    line-height: 1.5;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Toast Notification */
+.lh-toast {
+    position: fixed;
+    top: 1.5rem;
+    right: 1.5rem;
+    background: #10b981;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+    z-index: 9999;
+    font-weight: 600;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* =============================
+   Plan Status Bar (ADD-ONLY)
+   ============================= */
+.plan-status-bar{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  margin-top:6px;
+  cursor:pointer;
+  user-select:none;
+}
+.plan-pill{
+  font-size:12px;
+  padding:4px 8px;
+  border-radius:999px;
+  border:1px solid var(--border-color);
+  background:var(--bg-secondary);
+  color:var(--text-secondary);
+}
+.plan-pill b{
+  color:var(--text-primary);
+}
+.plan-pill.unlimited{
+  border-color:var(--success-color);
+  color:var(--success-color);
+}
+.chat-container.command-prompt .plan-status-bar{
+  display:none;
+}

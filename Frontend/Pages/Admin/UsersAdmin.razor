@@ -1,0 +1,525 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+@using LittleHelperAI.Shared.Models
+
+<div class="admin-grid">
+    <div class="admin-card admin-card-wide">
+        <div class="admin-card-title">User Management</div>
+        <div class="admin-card-sub">Promote / demote / delete users. Update credits. Everything is live.</div>
+
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-top:12px;">
+            <div class="admin-form-field" style="min-width:280px;">
+                <label>Search (id / username / email)</label>
+                <input @bind="_q" @bind:event="oninput" placeholder="e.g., 1 or john" />
+            </div>
+            <button class="admin-btn admin-btn-primary" @onclick="Reload" disabled="@_loading">↻ Refresh</button>
+        </div>
+
+        @if (_loading)
+        {
+            <div class="admin-muted" style="margin-top:12px;">Loading…</div>
+        }
+        else if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="admin-error" style="margin-top:12px;">@_error</div>
+        }
+        else if (_users.Count == 0)
+        {
+            <div class="admin-muted" style="margin-top:12px;">No users found.</div>
+        }
+        else
+        {
+            <div class="admin-table-wrap" style="margin-top:12px;">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th style="width:70px;">Id</th>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th style="width:100px;">Role</th>
+                            <th style="width:80px;">Plan</th>
+                            <th style="width:100px;">Credits</th>
+                            <th style="width:280px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var u in Filtered())
+                        {
+                            <tr>
+                                <td>@u.Id</td>
+                                <td><strong>@u.Username</strong></td>
+                                <td>@u.Email</td>
+                                <td>
+                                    <span class="pill @(u.Role?.ToLower() == "admin" ? "pill-admin" : "")">
+                                        @u.Role
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="pill @GetPlanPillClass(GetUserPlan(u.Id))" data-testid="user-plan-@u.Id">
+                                        @GetUserPlan(u.Id)
+                                    </span>
+                                </td>
+                                <td><strong>@u.Credits.ToString("F2")</strong></td>
+                                <td>
+                                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                        @if (u.Role?.ToLower() != "admin")
+                                        {
+                                            <button class="admin-btn admin-btn-xs admin-btn-primary" @onclick="(() => Promote(u.Id))" title="Promote to Admin">Admin</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="admin-btn admin-btn-xs" @onclick="(() => Demote(u.Id))" title="Demote to User">Demote</button>
+                                        }
+                                        <button class="admin-btn admin-btn-xs" @onclick="(() => OpenCredits(u))" title="Edit Credits">Credits</button>
+                                        <button class="admin-btn admin-btn-xs" @onclick="(() => OpenSubscription(u))" title="Manage Subscription">Subs</button>
+                                        <button class="admin-btn admin-btn-xs admin-btn-danger" @onclick="(() => Delete(u.Id))" title="Delete User">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="admin-muted" style="margin-top:10px;">
+                Showing @Filtered().Count() of @_users.Count users
+            </div>
+        }
+    </div>
+
+    <div class="admin-card">
+        <div class="admin-card-title">Credits Editor</div>
+        <div class="admin-card-sub">Set credits to a specific value for a user.</div>
+
+        @if (_creditUser is null)
+        {
+            <div class="admin-muted" style="margin-top:12px;">Select a user → Click "Credits" to edit</div>
+        }
+        else
+        {
+            <div style="padding:12px; background:linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1)); border-radius:12px; margin-top:12px; border:1px solid rgba(59, 130, 246, 0.2);">
+                <div style="font-weight:700; color:var(--text-primary);">@_creditUser.Username</div>
+                <div style="font-size:12px; color:var(--text-secondary);">ID: @_creditUser.Id • Current: @_creditUser.Credits.ToString("F2") credits</div>
+            </div>
+
+            <div class="admin-form-field" style="margin-top:14px;">
+                <label>New Credit Amount</label>
+                <input type="number" step="0.01" @bind="_creditValue" />
+            </div>
+
+            <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
+                <button class="admin-btn admin-btn-primary" @onclick="SaveCredits" disabled="@_savingCredits">
+                    @(_savingCredits ? "Saving..." : "Save Credits")
+                </button>
+                <button class="admin-btn" @onclick="ClearCredits" disabled="@_savingCredits">Cancel</button>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_creditStatus))
+            {
+                <div class="admin-muted" style="margin-top:10px;">@_creditStatus</div>
+            }
+        }
+    </div>
+
+    <!-- Subscription Manager Card -->
+    <div class="admin-card">
+        <div class="admin-card-title">Subscription Manager</div>
+        <div class="admin-card-sub">Assign or modify subscriptions for users.</div>
+
+        @if (_subUser is null)
+        {
+            <div class="admin-muted" style="margin-top:12px;">Select a user → Click "Subs" to manage</div>
+        }
+        else
+        {
+            <div style="padding:12px; background:linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1)); border-radius:12px; margin-top:12px; border:1px solid rgba(59, 130, 246, 0.2);">
+                <div style="font-weight:700; color:var(--text-primary);">@_subUser.Username</div>
+                <div style="font-size:12px; color:var(--text-secondary);">ID: @_subUser.Id • @_subUser.Email</div>
+            </div>
+
+            @if (_plansLoading)
+            {
+                <div class="admin-muted" style="margin-top:12px;">Loading plans...</div>
+            }
+            else
+            {
+                <div class="admin-form-field" style="margin-top:14px;">
+                    <label>Select Plan</label>
+                    <select @bind="_selectedPlanId">
+                        <option value="0">-- Select a plan --</option>
+                        @foreach (var plan in _plans)
+                        {
+                            <option value="@plan.Id">@plan.PlanTier (@plan.Credits credits)</option>
+
+                        }
+                    </select>
+                </div>
+
+                <div class="admin-form-field" style="margin-top:10px;">
+                    <label>Status</label>
+                    <select @bind="_subStatus">
+                        <option value="active">Active</option>
+                        <option value="canceled">Canceled</option>
+                        <option value="past_due">Past Due</option>
+                        <option value="trialing">Trialing</option>
+                    </select>
+                </div>
+
+                <div class="admin-form-field" style="margin-top:10px;">
+                    <label>Expires (UTC)</label>
+                    <input type="datetime-local" @bind="_subExpiry" />
+                </div>
+
+                <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
+                    <button class="admin-btn admin-btn-primary" @onclick="AssignSubscription" disabled="@_savingSub">
+                        @(_savingSub ? "⏳ Saving..." : "✅ Assign Subscription")
+                    </button>
+                    <button class="admin-btn" @onclick="ClearSubscription" disabled="@_savingSub">✕ Cancel</button>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(_subStatus2))
+                {
+                    <div class="admin-muted" style="margin-top:10px;">@_subStatus2</div>
+                }
+            }
+        }
+    </div>
+</div>
+
+<style>
+    .pill-admin {
+        background: linear-gradient(135deg, rgba(234, 179, 8, 0.15), rgba(251, 191, 36, 0.15)) !important;
+        color: #ca8a04 !important;
+        border-color: rgba(234, 179, 8, 0.3) !important;
+    }
+    [data-theme="dark"] .pill-admin {
+        background: linear-gradient(135deg, rgba(234, 179, 8, 0.2), rgba(251, 191, 36, 0.2)) !important;
+        color: #facc15 !important;
+    }
+    .pill-free {
+        background: linear-gradient(135deg, rgba(107, 114, 128, 0.1), rgba(75, 85, 99, 0.1)) !important;
+        color: #6b7280 !important;
+        border-color: rgba(107, 114, 128, 0.2) !important;
+    }
+    .pill-basic {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1)) !important;
+        color: #3b82f6 !important;
+        border-color: rgba(59, 130, 246, 0.2) !important;
+    }
+    .pill-pro {
+        background: linear-gradient(135deg, rgba(234, 179, 8, 0.15), rgba(202, 138, 4, 0.15)) !important;
+        color: #ca8a04 !important;
+        border-color: rgba(234, 179, 8, 0.3) !important;
+    }
+    .pill-enterprise {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(109, 40, 217, 0.15)) !important;
+        color: #8b5cf6 !important;
+        border-color: rgba(139, 92, 246, 0.3) !important;
+    }
+    [data-theme="dark"] .pill-pro {
+        background: linear-gradient(135deg, rgba(234, 179, 8, 0.2), rgba(202, 138, 4, 0.2)) !important;
+        color: #facc15 !important;
+    }
+</style>
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+    private string _q = "";
+
+    private List<UserDto> _users = new();
+    private Dictionary<int, string> _userPlanNames = new();
+
+    private UserDto? _creditUser;
+    private double _creditValue;
+    private bool _savingCredits;
+    private string? _creditStatus;
+
+    // Subscription management
+    private UserDto? _subUser;
+    private List<StripePlanDto> _plans = new();
+    private bool _plansLoading;
+    private int _selectedPlanId;
+    private string _subStatus = "active";
+    private DateTime _subExpiry = DateTime.UtcNow.AddDays(30);
+    private bool _savingSub;
+    private string? _subStatus2;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Reload();
+        await LoadPlans();
+        await LoadUserPlans();
+    }
+
+    private async Task LoadPlans()
+    {
+        _plansLoading = true;
+        try
+        {
+            _plans = await Http.GetFromJsonAsync<List<StripePlanDto>>("api/plans") ?? new();
+        }
+        catch { }
+        finally
+        {
+            _plansLoading = false;
+        }
+    }
+
+    private async Task LoadUserPlans()
+    {
+        _userPlanNames.Clear();
+
+        foreach (var user in _users)
+        {
+            try
+            {
+                var status =
+                    await Http.GetFromJsonAsync<PlanStatusDto>(
+                        $"api/plans/status/{user.Id}");
+
+                _userPlanNames[user.Id] =
+                    !string.IsNullOrWhiteSpace(status?.PlanName)
+                        ? status.PlanName
+                        : "FREE";
+            }
+            catch
+            {
+                _userPlanNames[user.Id] = "FREE";
+            }
+        }
+    }
+
+
+
+    private string GetUserPlan(int userId)
+    {
+        if (_userPlanNames.TryGetValue(userId, out var plan) &&
+            !string.IsNullOrWhiteSpace(plan))
+        {
+            return plan;
+        }
+
+        return "FREE";
+    }
+
+
+    private string GetPlanPillClass(string planName)
+    {
+        return planName?.ToLowerInvariant() switch
+        {
+            "free" => "pill-free",
+            "basic" => "pill-basic",
+            "pro" => "pill-pro",
+            "unlimited" => "pill-pro", // reuse Pro styling for Unlimited
+            _ => ""
+        };
+    }
+
+
+    private IEnumerable<UserDto> Filtered()
+    {
+        if (string.IsNullOrWhiteSpace(_q)) return _users;
+
+        var s = _q.Trim().ToLowerInvariant();
+        return _users.Where(u =>
+            u.Id.ToString() == s ||
+            (u.Username ?? "").ToLower().Contains(s) ||
+            (u.Email ?? "").ToLower().Contains(s));
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _users = await Http.GetFromJsonAsync<List<UserDto>>("api/users") ?? new();
+            await LoadUserPlans();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Promote(int id)
+    {
+        try
+        {
+            var resp = await Http.PostAsync($"api/users/promote/{id}", null);
+            if (!resp.IsSuccessStatusCode) _error = await resp.Content.ReadAsStringAsync();
+            await Reload();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private async Task Demote(int id)
+    {
+        try
+        {
+            var resp = await Http.PostAsync($"api/users/demote/{id}", null);
+            if (!resp.IsSuccessStatusCode) _error = await resp.Content.ReadAsStringAsync();
+            await Reload();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private void OpenCredits(UserDto u)
+    {
+        _creditUser = u;
+        _creditValue = u.Credits;
+        _creditStatus = null;
+    }
+
+    private void ClearCredits()
+    {
+        _creditUser = null;
+        _creditValue = 0;
+        _creditStatus = null;
+    }
+
+    private async Task SaveCredits()
+    {
+        if (_creditUser is null) return;
+
+        _savingCredits = true;
+        _creditStatus = null;
+        try
+        {
+            var resp = await Http.PostAsJsonAsync("api/users/update-credits", new { userId = _creditUser.Id, credits = _creditValue });
+            if (!resp.IsSuccessStatusCode)
+            {
+                _creditStatus = await resp.Content.ReadAsStringAsync();
+                return;
+            }
+
+            _creditStatus = "Saved.";
+            await Reload();
+            _creditUser = _users.FirstOrDefault(x => x.Id == _creditUser.Id);
+        }
+        catch (Exception ex)
+        {
+            _creditStatus = ex.Message;
+        }
+        finally
+        {
+            _savingCredits = false;
+        }
+    }
+
+    // Subscription methods
+    private void OpenSubscription(UserDto u)
+    {
+        _subUser = u;
+        _selectedPlanId = 0;
+        _subStatus = "active";
+        _subExpiry = DateTime.UtcNow.AddDays(30);
+        _subStatus2 = null;
+    }
+
+    private void ClearSubscription()
+    {
+        _subUser = null;
+        _selectedPlanId = 0;
+        _subStatus2 = null;
+    }
+
+    private async Task AssignSubscription()
+    {
+        // 🔒 FREE = 0 is VALID
+        if (_subUser is null || _selectedPlanId < 0)
+        {
+            _subStatus2 = "❌ Please select a plan.";
+            return;
+        }
+
+        _savingSub = true;
+        _subStatus2 = null;
+        try
+        {
+            var payload = new
+            {
+                userId = _subUser.Id,
+
+                // 🔥 AUTHORITATIVE:
+                // FREE => planId = 0
+                // PAID => actual StripePlan.Id
+                planId = _selectedPlanId,
+
+                status = _subStatus,
+                currentPeriodEndUtc = _subExpiry
+            };
+
+            var resp = await Http.PostAsJsonAsync(
+                "api/admin/subscriptions/assign",
+                payload
+            );
+
+            if (resp.IsSuccessStatusCode)
+            {
+                _subStatus2 = "✅ Subscription assigned successfully!";
+            }
+            else
+            {
+                _subStatus2 = "❌ " + await resp.Content.ReadAsStringAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _subStatus2 = "❌ " + ex.Message;
+        }
+        finally
+        {
+            _savingSub = false;
+        }
+    }
+
+
+
+    private async Task Delete(int id)
+    {
+        try
+        {
+            var resp = await Http.DeleteAsync($"api/users/{id}");
+            if (!resp.IsSuccessStatusCode) _error = await resp.Content.ReadAsStringAsync();
+            await Reload();
+            await LoadUserPlans();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    // DTO for plans
+    private class StripePlanDto
+    {
+        public int Id { get; set; }
+        public double Credits { get; set; }
+        public string PriceId { get; set; } = "";
+        public string PlanType { get; set; } = "";
+        public string PlanTier { get; set; } = "";
+
+    }
+
+    // DTO for plan status
+    private class PlanStatusDto
+    {
+        public bool HasActivePlan { get; set; }
+
+        // Existing
+        public string? PlanName { get; set; }
+        public string? PlanType { get; set; }
+
+        // ✅ Already returned by backend (StripePlanPolicy / ResolvePlan)
+        public string? PlanTier { get; set; }
+
+        public bool IsUnlimited { get; set; }
+        public double? DailyCreditsAllowance { get; set; }
+        public double? DailyCreditsRemaining { get; set; }
+        public DateTime? DailyCreditsNextResetUtc { get; set; }
+        public double WalletCredits { get; set; }
+    }
+
+}

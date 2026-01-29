@@ -1,0 +1,593 @@
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<div class="llm-selector-container">
+    <div class="llm-selector-row">
+        @* Backend Dropdown *@
+        <div class="llm-dropdown-wrapper">
+            <button class="llm-dropdown-button @(IsProviderDropdownOpen ? "open" : "")"
+                    @onclick="ToggleProviderDropdown"
+                    disabled="@IsLoading">
+                <span class="llm-dropdown-label">Model Backend</span>
+                <span class="llm-dropdown-value">
+                    @GetProviderDisplayName(SelectedProvider)
+                    @if (SelectedProvider == LlmProvider.Ollama && !OllamaAvailable)
+                    {
+                        <span class="status-indicator offline" title="Ollama not running"></span>
+                    }
+                    else if (SelectedProvider == LlmProvider.Ollama && OllamaAvailable)
+                    {
+                        <span class="status-indicator online" title="Ollama running"></span>
+                    }
+                </span>
+                <span class="dropdown-arrow">@(IsProviderDropdownOpen ? "▲" : "▼")</span>
+            </button>
+
+            @if (IsProviderDropdownOpen)
+            {
+                <div class="llm-dropdown-menu">
+                    <div class="llm-dropdown-header">
+                        <span class="llm-dropdown-title">Select Backend</span>
+                        <button class="llm-refresh-button" @onclick="RefreshProviders" title="Refresh">↻</button>
+                    </div>
+                    @foreach (var provider in Providers)
+                    {
+                        <div class="llm-dropdown-item @(provider.Provider == SelectedProvider ? "active" : "") @(!provider.IsAvailable ? "disabled" : "")"
+                             @onclick="() => SelectProvider(provider)">
+                            <span class="provider-name">@provider.Name</span>
+                            @if (provider.Provider == LlmProvider.Ollama)
+                            {
+                                <span class="status-indicator @(provider.IsAvailable ? "online" : "offline")"
+                                      title="@(provider.IsAvailable ? "Running" : "Not running")"></span>
+                            }
+                            <span class="model-count">@provider.Models.Count models</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        @* Local Model Dropdown *@
+        @if (SelectedProvider == LlmProvider.Local)
+        {
+            <div class="llm-dropdown-wrapper">
+                <button class="llm-dropdown-button @(IsModelDropdownOpen ? "open" : "")"
+                        @onclick="ToggleModelDropdown"
+                        disabled="@(IsLoading || !LocalModels.Any())">
+                    <span class="llm-dropdown-label">Local Model</span>
+                    <span class="llm-dropdown-value">
+                        @if (string.IsNullOrEmpty(SelectedModel))
+                        {
+                            <span class="placeholder">Select model...</span>
+                        }
+                        else
+                        {
+                            @SelectedModelDisplay
+                        }
+                    </span>
+                    <span class="dropdown-arrow">@(IsModelDropdownOpen ? "▲" : "▼")</span>
+                </button>
+
+                @if (IsModelDropdownOpen)
+                {
+                    <div class="llm-dropdown-menu model-menu">
+                        <div class="llm-dropdown-header">
+                            <span class="llm-dropdown-title">Select Local Model</span>
+                        </div>
+                        @if (!LocalModels.Any())
+                        {
+                            <div class="llm-dropdown-item disabled">
+                                <span>No local models found in /LLM folder</span>
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var model in LocalModels)
+                            {
+                                <div class="llm-dropdown-item @(model.Name == SelectedModel ? "active" : "")"
+                                     @onclick="() => SelectModel(model)">
+                                    <span class="model-name">@model.DisplayName</span>
+                                    @if (!string.IsNullOrEmpty(model.ParameterSize))
+                                    {
+                                        <span class="model-size">@model.ParameterSize</span>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        @* Ollama Model Dropdown *@
+        @if (SelectedProvider == LlmProvider.Ollama)
+        {
+            <div class="llm-dropdown-wrapper">
+                <button class="llm-dropdown-button @(IsOllamaDropdownOpen ? "open" : "")"
+                        @onclick="ToggleOllamaDropdown"
+                        disabled="@(IsLoading || !OllamaModels.Any())">
+                    <span class="llm-dropdown-label">Ollama Model</span>
+                    <span class="llm-dropdown-value">
+                        @if (string.IsNullOrEmpty(SelectedModel))
+                        {
+                            <span class="placeholder">Select model...</span>
+                        }
+                        else
+                        {
+                            @SelectedModelDisplay
+                        }
+                    </span>
+                    <span class="dropdown-arrow">@(IsOllamaDropdownOpen ? "▲" : "▼")</span>
+                </button>
+
+                @if (IsOllamaDropdownOpen)
+                {
+                    <div class="llm-dropdown-menu model-menu">
+                        <div class="llm-dropdown-header">
+                            <span class="llm-dropdown-title">Select Ollama Model</span>
+                        </div>
+                        @if (!OllamaModels.Any())
+                        {
+                            <div class="llm-dropdown-item disabled">
+                                <span>No Ollama models available</span>
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var model in OllamaModels)
+                            {
+                                <div class="llm-dropdown-item @(model.Name == SelectedModel ? "active" : "")"
+                                     @onclick="() => SelectModel(model)">
+                                    <span class="model-name">@model.DisplayName</span>
+                                    @if (!string.IsNullOrEmpty(model.ParameterSize))
+                                    {
+                                        <span class="model-size">@model.ParameterSize</span>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(StatusMessage))
+    {
+        <div class="llm-status-message @StatusClass">
+            @StatusMessage
+        </div>
+    }
+</div>
+
+<style>
+    .llm-selector-container {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .llm-selector-row {
+        display: flex;
+        gap: 0.75rem;
+        align-items: stretch;
+    }
+
+    .llm-dropdown-wrapper {
+        position: relative;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .llm-dropdown-button {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        background: var(--bg-secondary, #1a1a2e);
+        border: 1px solid var(--border-color, #2d2d44);
+        border-radius: 8px;
+        color: var(--text-primary, #e0e0e0);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+    }
+
+    .llm-dropdown-button:hover:not(:disabled) {
+        border-color: var(--accent-color, #6366f1);
+        background: var(--bg-hover, #1f1f35);
+    }
+
+    .llm-dropdown-button.open {
+        border-color: var(--accent-color, #6366f1);
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+
+    .llm-dropdown-button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .llm-dropdown-label {
+        font-size: 0.65rem;
+        color: var(--text-muted, #888);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .llm-dropdown-value {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        font-weight: 500;
+        max-width: calc(100% - 1.5rem);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .llm-dropdown-value .placeholder {
+        color: var(--text-muted, #888);
+    }
+
+    .dropdown-arrow {
+        position: absolute;
+        right: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 0.7rem;
+        color: var(--text-muted, #888);
+    }
+
+    .llm-dropdown-menu {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--bg-secondary, #1a1a2e);
+        border: 1px solid var(--accent-color, #6366f1);
+        border-top: none;
+        border-bottom-left-radius: 8px;
+        border-bottom-right-radius: 8px;
+        z-index: 100;
+        max-height: 240px;
+        overflow-y: auto;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .llm-dropdown-menu.model-menu {
+        max-height: 300px;
+    }
+
+    .llm-dropdown-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid var(--border-color, #2d2d44);
+        position: sticky;
+        top: 0;
+        background: var(--bg-secondary, #1a1a2e);
+    }
+
+    .llm-dropdown-title {
+        font-size: 0.7rem;
+        color: var(--text-muted, #888);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .llm-refresh-button {
+        background: transparent;
+        border: none;
+        color: var(--text-muted, #888);
+        cursor: pointer;
+        padding: 0.25rem;
+        font-size: 1rem;
+        line-height: 1;
+        transition: color 0.2s;
+    }
+
+    .llm-refresh-button:hover {
+        color: var(--accent-color, #6366f1);
+    }
+
+    .llm-dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.6rem 0.75rem;
+        cursor: pointer;
+        transition: background 0.15s ease;
+    }
+
+    .llm-dropdown-item:hover:not(.disabled) {
+        background: var(--bg-hover, #1f1f35);
+    }
+
+    .llm-dropdown-item.active {
+        background: var(--accent-color-dim, rgba(99, 102, 241, 0.15));
+        color: var(--accent-color, #6366f1);
+    }
+
+    .llm-dropdown-item.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .provider-name, .model-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .model-count, .model-size {
+        font-size: 0.7rem;
+        color: var(--text-muted, #888);
+        background: var(--bg-tertiary, #252540);
+        padding: 0.15rem 0.4rem;
+        border-radius: 4px;
+    }
+
+    .status-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .status-indicator.online {
+        background: #22c55e;
+        box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+    }
+
+    .status-indicator.offline {
+        background: #6b7280;
+    }
+
+    .llm-status-message {
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        animation: fadeIn 0.2s ease;
+    }
+
+    .llm-status-message.success {
+        background: rgba(34, 197, 94, 0.15);
+        color: #22c55e;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .llm-status-message.error {
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .llm-status-message.info {
+        background: rgba(99, 102, 241, 0.15);
+        color: #6366f1;
+        border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-4px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
+@code {
+    // Enum must match backend
+    public enum LlmProvider { Local = 0, Ollama = 1 }
+
+    private List<ProviderInfo> Providers = new();
+    private LlmProvider SelectedProvider = LlmProvider.Local;
+    private string? SelectedModel;
+    private string SelectedModelDisplay
+        => (SelectedProvider == LlmProvider.Ollama ? OllamaModels : LocalModels)
+            .FirstOrDefault(m => m.Name == SelectedModel)?.DisplayName ?? SelectedModel ?? "";
+
+    private bool IsProviderDropdownOpen = false;
+    private bool IsModelDropdownOpen = false;
+    private bool IsOllamaDropdownOpen = false;
+    private bool IsLoading = false;
+    private bool OllamaAvailable = false;
+
+    private string StatusMessage = "";
+    private string StatusClass = "info";
+
+    private List<ModelInfo> LocalModels => Providers
+        .FirstOrDefault(p => p.Provider == LlmProvider.Local)?.Models ?? new();
+
+    private List<ModelInfo> OllamaModels => Providers
+        .FirstOrDefault(p => p.Provider == LlmProvider.Ollama)?.Models ?? new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshProviders();
+    }
+
+    private async Task RefreshProviders()
+    {
+        IsLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var response = await Http.GetFromJsonAsync<ProvidersResponse>("api/llm/providers");
+            if (response != null)
+            {
+                Providers = response.Providers;
+                SelectedProvider = response.CurrentProvider;
+                SelectedModel = response.CurrentModel;
+
+                var ollamaProvider = Providers.FirstOrDefault(p => p.Provider == LlmProvider.Ollama);
+                OllamaAvailable = ollamaProvider?.IsAvailable ?? false;
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Failed to load providers: {ex.Message}", "error");
+        }
+        finally
+        {
+            IsLoading = false;
+            IsProviderDropdownOpen = false;
+            IsModelDropdownOpen = false;
+            IsOllamaDropdownOpen = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ToggleProviderDropdown()
+    {
+        IsProviderDropdownOpen = !IsProviderDropdownOpen;
+        if (IsProviderDropdownOpen)
+        {
+            IsModelDropdownOpen = false;
+            IsOllamaDropdownOpen = false;
+        }
+    }
+
+    private void ToggleModelDropdown()
+    {
+        IsModelDropdownOpen = !IsModelDropdownOpen;
+        if (IsModelDropdownOpen)
+        {
+            IsProviderDropdownOpen = false;
+            IsOllamaDropdownOpen = false;
+        }
+    }
+
+    private void ToggleOllamaDropdown()
+    {
+        IsOllamaDropdownOpen = !IsOllamaDropdownOpen;
+        if (IsOllamaDropdownOpen)
+        {
+            IsProviderDropdownOpen = false;
+            IsModelDropdownOpen = false;
+        }
+    }
+
+    private void SelectProvider(ProviderInfo provider)
+    {
+        if (!provider.IsAvailable)
+        {
+            ShowStatus($"{provider.Name} is not available", "error");
+            return;
+        }
+
+        if (provider.Provider != SelectedProvider)
+        {
+            SelectedProvider = provider.Provider;
+            SelectedModel = null; // Reset model selection
+        }
+
+        IsProviderDropdownOpen = false;
+        IsModelDropdownOpen = false;
+        IsOllamaDropdownOpen = false;
+        StateHasChanged();
+    }
+
+    private async Task SelectModel(ModelInfo model)
+    {
+        if (model.Name == SelectedModel)
+        {
+            IsModelDropdownOpen = false;
+            IsOllamaDropdownOpen = false;
+            return;
+        }
+
+        IsLoading = true;
+        IsModelDropdownOpen = false;
+        IsOllamaDropdownOpen = false;
+        ShowStatus($"Loading {model.DisplayName}...", "info");
+
+        try
+        {
+            var request = new ModelSelectionRequest
+            {
+                ModelName = model.Name,
+                Provider = SelectedProvider
+            };
+
+            var response = await Http.PostAsJsonAsync("api/llm/load", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                SelectedModel = model.Name;
+                ShowStatus($"Loaded {model.DisplayName}", "success");
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                ShowStatus($"Failed to load model: {error}", "error");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Error: {ex.Message}", "error");
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+
+            // Clear status after delay
+            await Task.Delay(3000);
+            StatusMessage = "";
+            StateHasChanged();
+        }
+    }
+
+    private void ShowStatus(string message, string type)
+    {
+        StatusMessage = message;
+        StatusClass = type;
+    }
+
+    private string GetProviderDisplayName(LlmProvider provider)
+    {
+        return provider switch
+        {
+            LlmProvider.Local => "Local (GGUF)",
+            LlmProvider.Ollama => "Ollama",
+            _ => provider.ToString()
+        };
+    }
+
+    // DTOs matching backend
+    public class ProvidersResponse
+    {
+        public LlmProvider CurrentProvider { get; set; }
+        public string? CurrentModel { get; set; }
+        public List<ProviderInfo> Providers { get; set; } = new();
+    }
+
+    public class ProviderInfo
+    {
+        public LlmProvider Provider { get; set; }
+        public string Name { get; set; } = "";
+        public bool IsAvailable { get; set; }
+        public List<ModelInfo> Models { get; set; } = new();
+    }
+
+    public class ModelInfo
+    {
+        public string Name { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public LlmProvider Provider { get; set; }
+        public long? SizeBytes { get; set; }
+        public string? ParameterSize { get; set; }
+    }
+
+    public class ModelSelectionRequest
+    {
+        public string ModelName { get; set; } = "";
+        public LlmProvider Provider { get; set; }
+    }
+}

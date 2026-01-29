@@ -1,0 +1,990 @@
+@inject IJSRuntime JS
+@using LittleHelperAI.Dashboard.Pages.Workbench
+
+<div class="workbench-container @(IsOpen ? "open" : "closed") @(IsChatCollapsed ? "expanded" : "")">
+    @if (IsOpen)
+    {
+        <div class="workbench-panel">
+            <!-- Resize Handle -->
+            <div class="workbench-resize-handle" @onmousedown="StartResize"></div>
+
+            <!-- Header -->
+            <div class="workbench-header">
+                <div class="workbench-tabs">
+                    <button class="workbench-tab @(CurrentView == WorkbenchView.Code ? "active" : "")"
+                            @onclick="() => SetView(WorkbenchView.Code)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="16 18 22 12 16 6"></polyline>
+                            <polyline points="8 6 2 12 8 18"></polyline>
+                        </svg>
+                        Code
+                    </button>
+                    <button class="workbench-tab @(CurrentView == WorkbenchView.Preview ? "active" : "")"
+                            @onclick="() => SetView(WorkbenchView.Preview)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                            <line x1="8" y1="21" x2="16" y2="21"></line>
+                            <line x1="12" y1="17" x2="12" y2="21"></line>
+                        </svg>
+                        Preview
+                    </button>
+                </div>
+
+                <div class="workbench-actions">
+                    <!-- Toggle Chat Collapse Button -->
+                    <button class="workbench-action-btn chat-collapse-btn @(IsChatCollapsed ? "active" : "")"
+                            @onclick="OnToggleChatCollapse"
+                            title="@(IsChatCollapsed ? "Show Chat" : "Expand Workspace")">
+                        @if (IsChatCollapsed)
+                        {
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        }
+                        else
+                        {
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        }
+                    </button>
+                    <button class="workbench-action-btn" @onclick="DownloadProject" title="Download Project">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                    </button>
+                    <button class="workbench-action-btn" @onclick="ToggleTerminal" title="Toggle Terminal">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="4 17 10 11 4 5"/>
+                            <line x1="12" y1="19" x2="20" y2="19"/>
+                        </svg>
+                    </button>
+                    <button class="workbench-close-btn" @onclick="Close" title="Close Workbench">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <div class="workbench-content">
+                @if (CurrentView == WorkbenchView.Code)
+                {
+                    <div class="workbench-code-view">
+                        <!-- File Tree -->
+                        <div class="file-tree-panel">
+                            <div class="file-tree-header">
+                                <span>Files</span>
+                                <span class="file-count">@(Files?.Count ?? 0)</span>
+                            </div>
+                            <div class="file-tree">
+                                @if (Files != null && Files.Any())
+                                {
+                                    @foreach (var file in Files)
+                                    {
+                                        <div class="file-item @(SelectedFile == file ? "selected" : "")"
+                                             @onclick="() => SelectFile(file)">
+                                            <svg class="file-icon" viewBox="0 0 24 24" fill="currentColor">
+                                                @if (IsFolder(file.Path))
+                                                {
+                                                    <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+                                                }
+                                                else
+                                                {
+                                                    <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+                                                }
+                                            </svg>
+                                            <span class="file-name" title="@file.Path">@GetFileName(file.Path)</span>
+                                            @if (file.IsModified)
+                                            {
+                                                <span class="file-modified-dot"></span>
+                                            }
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="file-tree-empty">
+                                        <p>No files generated yet</p>
+                                        <p class="hint">Files will appear here when the AI creates them</p>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Code Editor -->
+                        <div class="code-editor-panel">
+                            @if (SelectedFile != null)
+                            {
+                                <div class="editor-header">
+                                    <span class="editor-filename">@SelectedFile.Path</span>
+                                    <span class="editor-language">@GetLanguage(SelectedFile.Path)</span>
+                                </div>
+                                <div class="editor-content">
+                                    <pre class="code-block"><code>@SelectedFile.Content</code></pre>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="editor-placeholder">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                                        <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z"/>
+                                        <polyline points="14 2 14 8 20 8"/>
+                                        <line x1="16" y1="13" x2="8" y2="13"/>
+                                        <line x1="16" y1="17" x2="8" y2="17"/>
+                                        <polyline points="10 9 9 9 8 9"/>
+                                    </svg>
+                                    <p>Select a file to view its contents</p>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+                else if (CurrentView == WorkbenchView.Preview)
+                {
+                    <div class="workbench-preview-view">
+                        @if (!string.IsNullOrEmpty(PreviewUrl))
+                        {
+                            <div class="preview-toolbar">
+                                <input type="text" class="preview-url-input" value="@PreviewUrl" readonly />
+                                <button class="preview-refresh-btn" @onclick="RefreshPreview">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="23 4 23 10 17 10"/>
+                                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <iframe class="preview-iframe" src="@PreviewUrl" @ref="previewFrame"></iframe>
+                        }
+                        else if (Files != null && Files.Any())
+                        {
+                            <div class="preview-placeholder">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                                    <polygon points="5 3 19 12 5 21 5 3"/>
+                                </svg>
+                                <p>Click "Run Project" to preview</p>
+                                <button class="preview-run-btn" @onclick="RunProject">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <polygon points="5 3 19 12 5 21 5 3"/>
+                                    </svg>
+                                    Run Project
+                                </button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="preview-placeholder">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                                    <line x1="8" y1="21" x2="16" y2="21"/>
+                                    <line x1="12" y1="17" x2="12" y2="21"/>
+                                </svg>
+                                <p>No preview available</p>
+                                <p class="hint">Generate a project to see the preview</p>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- Terminal (collapsible) -->
+            @if (ShowTerminal)
+            {
+                <div class="workbench-terminal">
+                    <div class="terminal-header">
+                        <span>Terminal</span>
+                        <div class="terminal-actions">
+                            @if (TerminalOutput.Any(t => t.IsError))
+                            {
+                                <button class="terminal-report-btn" @onclick="ReportLastErrorToAI" title="Report errors to AI for fixing">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+                                    </svg>
+                                    Fix Errors
+                                </button>
+                            }
+                            <button class="terminal-clear-btn" @onclick="ClearTerminal" title="Clear terminal">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"/>
+                                    <line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
+                            </button>
+                            <button class="terminal-close-btn" @onclick="ToggleTerminal">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="18 15 12 9 6 15"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="terminal-content">
+                        @if (TerminalOutput != null && TerminalOutput.Any())
+                        {
+                            @foreach (var line in TerminalOutput)
+                            {
+                                <div class="terminal-line @(line.IsError ? "error" : "")">
+                                    <span class="terminal-time">[@line.Timestamp.ToString("HH:mm:ss")]</span>
+                                    @line.Text
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="terminal-empty">Ready</div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .workbench-container {
+        position: fixed;
+        top: 64px;
+        right: 0;
+        bottom: 0;
+        width: 0;
+        background: var(--bg-primary, #0f0f1a);
+        border-left: 1px solid var(--border-color, #333);
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 100;
+        overflow: hidden;
+    }
+
+    .workbench-container.open {
+        width: 50%;
+        min-width: 400px;
+        max-width: 800px;
+    }
+
+    .workbench-container.open.expanded {
+        /* Full width when chat is collapsed */
+        width: 100%;
+        max-width: 100%;
+        left: 0;
+    }
+
+    .chat-collapse-btn.active {
+        background: var(--accent-color, #6366f1);
+        color: white;
+    }
+
+    .workbench-panel {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    .workbench-resize-handle {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        cursor: ew-resize;
+        background: transparent;
+        transition: background 0.2s;
+        z-index: 10;
+    }
+
+    .workbench-resize-handle:hover {
+        background: var(--accent-color, #6366f1);
+    }
+
+    /* Header */
+    .workbench-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        background: var(--bg-secondary, #1a1a2e);
+        border-bottom: 1px solid var(--border-color, #333);
+    }
+
+    .workbench-tabs {
+        display: flex;
+        gap: 0.25rem;
+    }
+
+    .workbench-tab {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        color: var(--text-secondary, #888);
+        font-size: 0.85rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .workbench-tab:hover {
+        background: var(--bg-hover, #252540);
+        color: var(--text-primary, #fff);
+    }
+
+    .workbench-tab.active {
+        background: var(--accent-color, #6366f1);
+        color: white;
+    }
+
+    .workbench-tab svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .workbench-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .workbench-action-btn,
+    .workbench-close-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        color: var(--text-secondary, #888);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .workbench-action-btn:hover,
+    .workbench-close-btn:hover {
+        background: var(--bg-hover, #252540);
+        color: var(--text-primary, #fff);
+    }
+
+    .workbench-close-btn:hover {
+        color: #ef4444;
+    }
+
+    .workbench-action-btn svg,
+    .workbench-close-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Content */
+    .workbench-content {
+        flex: 1;
+        overflow: hidden;
+    }
+
+    /* Code View */
+    .workbench-code-view {
+        display: flex;
+        height: 100%;
+    }
+
+    /* File Tree */
+    .file-tree-panel {
+        width: 200px;
+        border-right: 1px solid var(--border-color, #333);
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-secondary, #1a1a2e);
+    }
+
+    .file-tree-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--text-secondary, #888);
+        border-bottom: 1px solid var(--border-color, #333);
+    }
+
+    .file-count {
+        background: var(--accent-color, #6366f1);
+        color: white;
+        padding: 0.1rem 0.4rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+    }
+
+    .file-tree {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.5rem;
+    }
+
+    .file-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.85rem;
+        color: var(--text-secondary, #aaa);
+    }
+
+    .file-item:hover {
+        background: var(--bg-hover, #252540);
+        color: var(--text-primary, #fff);
+    }
+
+    .file-item.selected {
+        background: var(--accent-color, #6366f1);
+        color: white;
+    }
+
+    .file-icon {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+    }
+
+    .file-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .file-modified-dot {
+        width: 6px;
+        height: 6px;
+        background: #f59e0b;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .file-tree-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        text-align: center;
+        color: var(--text-secondary, #888);
+        padding: 1rem;
+    }
+
+    .file-tree-empty p {
+        margin: 0.25rem 0;
+        font-size: 0.85rem;
+    }
+
+    .file-tree-empty .hint {
+        font-size: 0.75rem;
+        color: var(--text-tertiary, #666);
+    }
+
+    /* Code Editor */
+    .code-editor-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .editor-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        background: var(--bg-tertiary, #252540);
+        border-bottom: 1px solid var(--border-color, #333);
+        font-size: 0.8rem;
+    }
+
+    .editor-filename {
+        color: var(--text-primary, #fff);
+        font-weight: 500;
+    }
+
+    .editor-language {
+        color: var(--accent-color, #6366f1);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+    }
+
+    .editor-content {
+        flex: 1;
+        overflow: auto;
+        background: var(--bg-primary, #0f0f1a);
+    }
+
+    .code-block {
+        margin: 0;
+        padding: 1rem;
+        font-family: 'JetBrains Mono', 'Consolas', monospace;
+        font-size: 0.85rem;
+        line-height: 1.6;
+        color: var(--text-primary, #e0e0e0);
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    .editor-placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: var(--text-secondary, #888);
+    }
+
+    .editor-placeholder svg {
+        width: 64px;
+        height: 64px;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    .editor-placeholder p {
+        font-size: 0.9rem;
+    }
+
+    /* Preview View */
+    .workbench-preview-view {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    .preview-toolbar {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        background: var(--bg-secondary, #1a1a2e);
+        border-bottom: 1px solid var(--border-color, #333);
+    }
+
+    .preview-url-input {
+        flex: 1;
+        padding: 0.5rem 0.75rem;
+        background: var(--bg-tertiary, #252540);
+        border: 1px solid var(--border-color, #333);
+        border-radius: 6px;
+        color: var(--text-primary, #fff);
+        font-size: 0.85rem;
+        font-family: monospace;
+    }
+
+    .preview-refresh-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        background: var(--bg-tertiary, #252540);
+        border: 1px solid var(--border-color, #333);
+        border-radius: 6px;
+        color: var(--text-secondary, #888);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .preview-refresh-btn:hover {
+        background: var(--accent-color, #6366f1);
+        color: white;
+        border-color: var(--accent-color, #6366f1);
+    }
+
+    .preview-refresh-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .preview-iframe {
+        flex: 1;
+        width: 100%;
+        border: none;
+        background: white;
+    }
+
+    .preview-placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: var(--text-secondary, #888);
+        background: var(--bg-primary, #0f0f1a);
+    }
+
+    .preview-placeholder svg {
+        width: 64px;
+        height: 64px;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    .preview-placeholder p {
+        font-size: 0.9rem;
+        margin: 0.25rem 0;
+    }
+
+    .preview-placeholder .hint {
+        font-size: 0.8rem;
+        color: var(--text-tertiary, #666);
+    }
+
+    .preview-run-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 1rem;
+        padding: 0.75rem 1.5rem;
+        background: var(--accent-color, #6366f1);
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .preview-run-btn:hover {
+        background: var(--accent-hover, #4f46e5);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .preview-run-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Terminal */
+    .workbench-terminal {
+        height: 200px;
+        border-top: 1px solid var(--border-color, #333);
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-secondary, #1a1a2e);
+    }
+
+    .terminal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        background: var(--bg-tertiary, #252540);
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-secondary, #888);
+    }
+
+    .terminal-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .terminal-report-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.25rem 0.5rem;
+        background: rgba(239, 68, 68, 0.2);
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        color: #ef4444;
+        font-size: 0.7rem;
+        font-weight: 500;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: all 0.2s;
+    }
+
+    .terminal-report-btn:hover {
+        background: rgba(239, 68, 68, 0.3);
+        border-color: #ef4444;
+    }
+
+    .terminal-report-btn svg {
+        width: 12px;
+        height: 12px;
+    }
+
+    .terminal-clear-btn,
+    .terminal-close-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        background: transparent;
+        border: none;
+        color: var(--text-secondary, #888);
+        cursor: pointer;
+        border-radius: 4px;
+        transition: all 0.2s;
+    }
+
+    .terminal-clear-btn:hover,
+    .terminal-close-btn:hover {
+        background: var(--bg-hover, #333);
+        color: var(--text-primary, #fff);
+    }
+
+    .terminal-clear-btn svg,
+    .terminal-close-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .terminal-time {
+        color: var(--text-secondary, #666);
+        margin-right: 0.5rem;
+        font-size: 0.7rem;
+    }
+
+    .terminal-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.5rem 1rem;
+        font-family: 'JetBrains Mono', 'Consolas', monospace;
+        font-size: 0.8rem;
+        line-height: 1.5;
+    }
+
+    .terminal-line {
+        color: var(--text-primary, #e0e0e0);
+    }
+
+    .terminal-line.error {
+        color: #ef4444;
+    }
+
+    .terminal-empty {
+        color: var(--text-tertiary, #666);
+    }
+
+    /* Responsive */
+    @@media (max-width: 1200px) {
+        .workbench-container.open {
+            width: 60%;
+        }
+    }
+
+    @@media (max-width: 900px) {
+        .workbench-container.open {
+            width: 100%;
+            min-width: unset;
+        }
+
+        .file-tree-panel {
+            width: 150px;
+        }
+    }
+</style>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public bool IsChatCollapsed { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnToggleChatCollapse { get; set; }
+    [Parameter] public List<ProjectFile>? Files { get; set; }
+    [Parameter] public string? PreviewUrl { get; set; }
+    [Parameter] public EventCallback OnRunProject { get; set; }
+    [Parameter] public EventCallback OnRefreshPreview { get; set; }
+    [Parameter] public EventCallback OnDownloadProject { get; set; }
+    [Parameter] public EventCallback<ErrorInfo> OnErrorReported { get; set; }
+
+    public class ErrorInfo
+    {
+        public string ErrorType { get; set; } = "Runtime";
+        public string Message { get; set; } = "";
+        public string? StackTrace { get; set; }
+        public string? FilePath { get; set; }
+        public int LineNumber { get; set; }
+    }
+
+    private WorkbenchView CurrentView { get; set; } = WorkbenchView.Code;
+    private ProjectFile? SelectedFile { get; set; }
+    private bool ShowTerminal { get; set; } = false;
+    private List<TerminalLine> TerminalOutput { get; set; } = new();
+    private ElementReference previewFrame;
+
+    protected override void OnParametersSet()
+    {
+        // Auto-select first file if none selected
+        if (SelectedFile == null && Files?.Any() == true)
+        {
+            SelectedFile = Files.First();
+        }
+    }
+
+    private void SetView(WorkbenchView view)
+    {
+        CurrentView = view;
+    }
+
+    private void SelectFile(ProjectFile file)
+    {
+        SelectedFile = file;
+    }
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task RunProject()
+    {
+        await OnRunProject.InvokeAsync();
+    }
+
+    private async Task DownloadProject()
+    {
+        await OnDownloadProject.InvokeAsync();
+    }
+
+    private void ToggleTerminal()
+    {
+        ShowTerminal = !ShowTerminal;
+    }
+
+    private async Task RefreshPreview()
+    {
+        // Call the parent to regenerate the preview
+        await OnRefreshPreview.InvokeAsync();
+    }
+
+    private void StartResize(MouseEventArgs e)
+    {
+        // Resize functionality would be implemented via JS interop
+    }
+
+    private string GetFileName(string path)
+    {
+        var parts = path.Replace("\\", "/").Split('/');
+        return parts.LastOrDefault() ?? path;
+    }
+
+    private bool IsFolder(string path)
+    {
+        return path.EndsWith("/") || path.EndsWith("\\");
+    }
+
+    private string GetLanguage(string path)
+    {
+        var ext = Path.GetExtension(path).ToLower();
+        return ext switch
+        {
+            ".cs" => "C#",
+            ".js" => "JavaScript",
+            ".ts" => "TypeScript",
+            ".jsx" => "JSX",
+            ".tsx" => "TSX",
+            ".html" => "HTML",
+            ".css" => "CSS",
+            ".scss" => "SCSS",
+            ".json" => "JSON",
+            ".xml" => "XML",
+            ".yaml" or ".yml" => "YAML",
+            ".md" => "Markdown",
+            ".py" => "Python",
+            ".java" => "Java",
+            ".go" => "Go",
+            ".rs" => "Rust",
+            ".sql" => "SQL",
+            ".sh" => "Shell",
+            ".razor" => "Razor",
+            _ => ext.TrimStart('.')
+        };
+    }
+
+    public enum WorkbenchView
+    {
+        Code,
+        Preview
+    }
+
+    // Public methods for external control
+    public void AddTerminalLine(string text, bool isError = false)
+    {
+        TerminalOutput.Add(new TerminalLine { Text = text, IsError = isError, Timestamp = DateTime.Now });
+        if (!ShowTerminal) ShowTerminal = true;
+        if (isError) LastError = text;
+        StateHasChanged();
+    }
+
+    private string? LastError { get; set; }
+
+    private async Task ReportLastErrorToAI()
+    {
+        if (string.IsNullOrEmpty(LastError))
+            return;
+
+        // Collect all error lines from terminal
+        var errorLines = TerminalOutput
+            .Where(t => t.IsError)
+            .Select(t => t.Text)
+            .ToList();
+
+        var errorInfo = new ErrorInfo
+        {
+            ErrorType = "Runtime",
+            Message = string.Join("\n", errorLines),
+            FilePath = SelectedFile?.Path
+        };
+
+        await OnErrorReported.InvokeAsync(errorInfo);
+        AddTerminalLine("Error reported to AI - waiting for fix...", false);
+    }
+
+    public void ClearErrors()
+    {
+        LastError = null;
+        TerminalOutput.RemoveAll(t => t.IsError);
+        StateHasChanged();
+    }
+
+    public void ClearTerminal()
+    {
+        TerminalOutput.Clear();
+        StateHasChanged();
+    }
+
+    public void AddFile(ProjectFile file)
+    {
+        Files ??= new List<ProjectFile>();
+        var existing = Files.FirstOrDefault(f => f.Path == file.Path);
+        if (existing != null)
+        {
+            existing.Content = file.Content;
+            existing.IsModified = true;
+        }
+        else
+        {
+            Files.Add(file);
+        }
+        StateHasChanged();
+    }
+
+    public void ClearFiles()
+    {
+        Files?.Clear();
+        SelectedFile = null;
+        StateHasChanged();
+    }
+
+    public class TerminalLine
+    {
+        public string Text { get; set; } = "";
+        public bool IsError { get; set; }
+        public DateTime Timestamp { get; set; } = DateTime.Now;
+    }
+}

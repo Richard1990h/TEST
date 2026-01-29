@@ -1,0 +1,318 @@
+@inject HttpClient Http
+
+<div class="admin-card" style="margin-bottom: 1.5rem;">
+    <div class="admin-card-title">Referral Reward Settings</div>
+    <div class="admin-card-sub">Configure how many credits users earn from referrals</div>
+
+    @if (isLoading)
+    {
+        <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+            <span class="loading-spinner"></span> Loading settings...
+        </div>
+    }
+    else
+    {
+        <div class="admin-form-grid" style="margin-top: 1.5rem;">
+            <div class="admin-form-field">
+                <label>Referrer Reward (Credits)</label>
+                <input type="number" step="1" min="0" @bind="referrerCredits" placeholder="50" />
+                <small style="color: var(--text-tertiary); font-size: 11px;">Credits given to the person who shared their code</small>
+            </div>
+
+            <div class="admin-form-field">
+                <label>New User Reward (Credits)</label>
+                <input type="number" step="1" min="0" @bind="refereeCredits" placeholder="25" />
+                <small style="color: var(--text-tertiary); font-size: 11px;">Credits given to new users who use a referral code</small>
+            </div>
+
+            <div class="admin-form-field admin-form-field-wide">
+                <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer;">
+                    <input type="checkbox" @bind="isEnabled" style="width: 18px; height: 18px; accent-color: var(--primary-500);" />
+                    <span>Enable Referral Program</span>
+                </label>
+                <small style="color: var(--text-tertiary); font-size: 11px;">When disabled, referral codes won't award any credits</small>
+            </div>
+        </div>
+
+        <div style="margin-top: 1.5rem; display: flex; gap: 1rem; align-items: center;">
+            <button class="admin-btn admin-btn-primary" @onclick="SaveSettings" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span class="loading-spinner"></span>
+                }
+                Save Settings
+            </button>
+            
+            @if (!string.IsNullOrEmpty(statusMessage))
+            {
+                <span style="color: @(isSuccess ? "var(--color-success)" : "var(--color-error)"); font-size: 13px; font-weight: 600;">
+                    @statusMessage
+                </span>
+            }
+        </div>
+    }
+</div>
+
+<!-- Statistics Section -->
+<div class="admin-card" style="margin-bottom: 1.5rem;">
+    <div class="admin-card-title">Referral Statistics</div>
+    <div class="admin-card-sub">Overview of your referral program performance</div>
+
+    <div class="admin-stats" style="margin-top: 1rem;">
+        <div class="stat">
+            <div class="stat-label">Total Referrals</div>
+            <div class="stat-value">@stats.TotalReferrals</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Credits Awarded</div>
+            <div class="stat-value">@stats.TotalCreditsAwarded.ToString("N0")</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Active Referrers</div>
+            <div class="stat-value">@stats.ActiveReferrers</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Avg Per Referrer</div>
+            <div class="stat-value">@(stats.ActiveReferrers > 0 ? (stats.TotalReferrals / (double)stats.ActiveReferrers).ToString("N1") : "0")</div>
+        </div>
+    </div>
+</div>
+
+<!-- Top Referrers -->
+@if (stats.TopReferrers.Any())
+{
+    <div class="admin-card" style="margin-bottom: 1.5rem;">
+        <div class="admin-card-title">Top Referrers</div>
+        <div class="admin-card-sub">Users who have referred the most people</div>
+
+        <div class="admin-table-wrap" style="margin-top: 1rem; max-height: 300px;">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Referrals</th>
+                        <th>Credits Earned</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{ int rank = 1; }
+                    @foreach (var referrer in stats.TopReferrers)
+                    {
+                        <tr>
+                            <td>
+                                @if (rank == 1) { <span>🥇</span> }
+                                else if (rank == 2) { <span>🥈</span> }
+                                else if (rank == 3) { <span>🥉</span> }
+                                else { <span>#@rank</span> }
+                            </td>
+                            <td style="font-weight: 600;">@referrer.Username</td>
+                            <td style="color: var(--text-secondary);">@referrer.Email</td>
+                            <td><span class="pill" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;">@referrer.ReferralCount</span></td>
+                            <td><span class="pill" style="background: rgba(59, 130, 246, 0.1); color: var(--primary-500);">@referrer.TotalCreditsEarned.ToString("N0")</span></td>
+                        </tr>
+                        rank++;
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+<!-- Recent Referrals -->
+<div class="admin-card">
+    <div class="admin-card-title">📜 Recent Referrals</div>
+    <div class="admin-card-sub">Latest referral transactions</div>
+
+    @if (!stats.RecentReferrals.Any())
+    {
+        <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">🎁</div>
+            <div>No referrals yet. Share referral codes to get started!</div>
+        </div>
+    }
+    else
+    {
+        <div class="admin-table-wrap" style="margin-top: 1rem; max-height: 400px;">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Referrer</th>
+                        <th>New User</th>
+                        <th>Code</th>
+                        <th>Referrer +</th>
+                        <th>New User +</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var transaction in stats.RecentReferrals)
+                    {
+                        <tr>
+                            <td style="color: var(--text-secondary); font-size: 12px;">@transaction.CreatedAt.ToString("MMM dd, yyyy HH:mm")</td>
+                            <td style="font-weight: 600;">@transaction.ReferrerUsername</td>
+                            <td>@transaction.RefereeUsername</td>
+                            <td><code style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px; font-size: 11px;">@transaction.ReferralCode</code></td>
+                            <td><span style="color: #22c55e; font-weight: 600;">+@transaction.ReferrerCredits.ToString("N0")</span></td>
+                            <td><span style="color: #22c55e; font-weight: 600;">+@transaction.RefereeCredits.ToString("N0")</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<style>
+    .loading-spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(59, 130, 246, 0.3);
+        border-top-color: var(--primary-500);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
+
+@code {
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private string statusMessage = "";
+    private bool isSuccess = false;
+
+    // Settings
+    private double referrerCredits = 50;
+    private double refereeCredits = 25;
+    private bool isEnabled = true;
+
+    // Stats
+    private ReferralStatsDto stats = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            // Load settings
+            var settingsResponse = await Http.GetAsync("api/admin/rewards/settings");
+            if (settingsResponse.IsSuccessStatusCode)
+            {
+                var settings = await settingsResponse.Content.ReadFromJsonAsync<ReferralSettingsResponse>();
+                if (settings != null)
+                {
+                    referrerCredits = settings.ReferrerCredits;
+                    refereeCredits = settings.RefereeCredits;
+                    isEnabled = settings.IsEnabled;
+                }
+            }
+
+            // Load stats
+            var statsResponse = await Http.GetAsync("api/admin/rewards/stats");
+            if (statsResponse.IsSuccessStatusCode)
+            {
+                stats = await statsResponse.Content.ReadFromJsonAsync<ReferralStatsDto>() ?? new();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading referral data: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveSettings()
+    {
+        isSaving = true;
+        statusMessage = "";
+
+        try
+        {
+            var request = new
+            {
+                ReferrerCredits = referrerCredits,
+                RefereeCredits = refereeCredits,
+                IsEnabled = isEnabled
+            };
+
+            var response = await Http.PostAsJsonAsync("api/admin/rewards/settings", request);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                isSuccess = true;
+                statusMessage = "✅ Settings saved successfully!";
+            }
+            else
+            {
+                isSuccess = false;
+                statusMessage = "❌ Failed to save settings";
+            }
+        }
+        catch (Exception ex)
+        {
+            isSuccess = false;
+            statusMessage = $"❌ Error: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+            
+            // Clear message after 3 seconds
+            await Task.Delay(3000);
+            statusMessage = "";
+            StateHasChanged();
+        }
+    }
+
+    // Response models
+    private class ReferralSettingsResponse
+    {
+        public int Id { get; set; }
+        public double ReferrerCredits { get; set; }
+        public double RefereeCredits { get; set; }
+        public bool IsEnabled { get; set; }
+    }
+
+    private class ReferralStatsDto
+    {
+        public int TotalReferrals { get; set; }
+        public double TotalCreditsAwarded { get; set; }
+        public int ActiveReferrers { get; set; }
+        public List<TopReferrerDto> TopReferrers { get; set; } = new();
+        public List<RecentReferralDto> RecentReferrals { get; set; } = new();
+    }
+
+    private class TopReferrerDto
+    {
+        public int UserId { get; set; }
+        public string Username { get; set; } = "";
+        public string Email { get; set; } = "";
+        public int ReferralCount { get; set; }
+        public double TotalCreditsEarned { get; set; }
+    }
+
+    private class RecentReferralDto
+    {
+        public int Id { get; set; }
+        public string ReferrerUsername { get; set; } = "";
+        public string RefereeUsername { get; set; } = "";
+        public string ReferralCode { get; set; } = "";
+        public double ReferrerCredits { get; set; }
+        public double RefereeCredits { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+}

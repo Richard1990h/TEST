@@ -1,0 +1,525 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject UserSessionService Session
+
+<div class="admin-grid">
+    <div class="admin-card admin-card-wide">
+        <div class="admin-card-title">User Subscriptions</div>
+        <div class="admin-card-sub">View and manage user subscription status.</div>
+
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-top:12px;">
+            <div class="admin-form-field" style="min-width:260px;">
+                <label>Search (user / plan / subscription)</label>
+                <input @bind="_search" @bind:event="oninput" />
+            </div>
+            <button class="admin-btn" @onclick="Refresh">↻ Refresh</button>
+            <button class="admin-btn admin-btn-primary" @onclick="ShowAssign">Assign Subscription</button>
+        </div>
+
+        @if (_loading)
+        {
+            <div class="admin-muted" style="margin-top:12px;">Loading…</div>
+        }
+        else
+        {
+            <table class="admin-table" style="margin-top:12px;">
+                <thead>
+                    <tr>
+                        <th>Id</th>
+                        <th>User</th>
+                        <th>Plan</th>
+                        <th>Status</th>
+                        <th>Period End</th>
+                        <th>Subscription</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in Filtered())
+                    {
+                        <tr>
+                            <td>@s.Id</td>
+                            <td>
+                                <strong>@s.UserName</strong>
+                                <div class="admin-muted">Id: @s.UserId</div>
+                            </td>
+                            <td>
+                                <strong>@s.PlanName</strong>
+                                <div class="admin-muted">@s.PlanTier</div>
+                            </td>
+                            <td>
+                                <span class="pill @StatusPillClass(s.Status)">
+                                    @StatusIcon(s.Status) @s.Status
+                                </span>
+                            </td>
+                            <td>@s.CurrentPeriodEndUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@s.SubscriptionId</td>
+                            <td style="display:flex; gap:6px;">
+                                <button class="admin-btn admin-btn-xs admin-btn-primary"
+                                        title="Edit"
+                                        @onclick="() => Edit(s)">
+                                    Edit
+                                </button>
+
+                                @if (s.Status != "canceled")
+                                {
+                                    <button class="admin-btn admin-btn-xs admin-btn-danger"
+                                            title="Cancel"
+                                            @onclick="() => ShowCancelConfirm(s)">
+                                        Cancel
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+
+
+    <div class="admin-card">
+
+@* ================= EDIT ================= *@
+@if (_editing != null)
+{
+    <div class="admin-card-title">Edit Subscription</div>
+
+    <!-- READ-ONLY CONTEXT -->
+    <div class="admin-muted" style="margin-bottom:12px; line-height:1.6;">
+        <div>
+            <strong>User:</strong> @_editing.UserName
+            <span style="opacity:.7;">(Id: @_editing.UserId)</span>
+        </div>
+
+        <div style="font-size:12px; opacity:.75;">
+            Subscription: @_editing.SubscriptionId
+        </div>
+    </div>
+
+    <!-- ✅ PLAN (NOW EDITABLE) -->
+    <div class="admin-form-field">
+        <label>Plan</label>
+                <select value="@_editing.PlanId"
+                        @onchange="OnEditPlanChanged">
+                    @foreach (var p in _plans)
+                    {
+                        <option value="@p.Id">@p.DisplayName</option>
+                    }
+                </select>
+
+
+        @if (_editing.IsUnlimited)
+        {
+            <div style="margin-top:6px;">
+                <span class="pill pill-pro">Unlimited</span>
+            </div>
+        }
+    </div>
+
+    <!-- STATUS -->
+    <div class="admin-form-field">
+        <label>Status</label>
+        <input @bind="_editing.Status" />
+    </div>
+
+    <!-- PERIOD END -->
+    <div class="admin-form-field">
+        <label>Period End</label>
+        <input type="datetime-local"
+               value="@_editingPeriodEndLocal"
+               @onchange="e => _editingPeriodEndLocal = e.Value?.ToString() ?? string.Empty" />
+    </div>
+
+    <!-- ACTIONS -->
+    <div style="display:flex; gap:10px; margin-top:10px;">
+        <button class="admin-btn admin-btn-primary" @onclick="SaveEdit">
+            Save
+        </button>
+        <button class="admin-btn" @onclick="CancelEdit">
+            Cancel
+        </button>
+    </div>
+}
+
+
+
+        @* ================= CANCEL ================= *@
+        else if (_showCancelConfirm && _cancelTarget != null)
+        {
+            <div class="admin-card-title">Cancel Subscription</div>
+
+            <div class="admin-form-field">
+                <label>Cancellation Type</label>
+                <select @bind="_cancelImmediate">
+                    <option value="false">Cancel at period end</option>
+                    <option value="true">Cancel immediately</option>
+                </select>
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <button class="admin-btn admin-btn-danger" @onclick="ConfirmCancel">
+                    Confirm Cancel
+                </button>
+                <button class="admin-btn" @onclick="HideCancelConfirm">Back</button>
+            </div>
+        }
+
+        @* ================= ASSIGN ================= *@
+        else if (_showAssign)
+        {
+            <div class="admin-card-title">Assign Subscription</div>
+
+            <div class="admin-form-field">
+                <label>User</label>
+                <input value="@_userSearch"
+                       placeholder="Search user by id / name / email"
+                       @oninput="OnUserInput" />
+
+                @if (_userResults.Count > 0)
+                {
+                    <div class="admin-dropdown" style="max-height:220px; overflow:auto;">
+                        @foreach (var u in _userResults)
+                        {
+                            <div class="admin-dropdown-item"
+                                 @onclick="() => SelectUser(u)">
+                                @u.Display
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="admin-form-field">
+                <label>Plan</label>
+                <select @bind="_assign.PlanId">
+                    <option value="0">Select plan…</option>
+                    @foreach (var p in _plans)
+                    {
+                        <option value="@p.Id">@p.DisplayName</option>
+                    }
+                </select>
+            </div>
+
+            <div class="admin-form-field">
+                <label>Status</label>
+                <input @bind="_assign.Status" />
+            </div>
+
+            <div class="admin-form-field">
+                <label>Period End</label>
+                <input type="datetime-local"
+                       value="@_assignPeriodEndLocal"
+                       @onchange="OnAssignPeriodEndChanged" />
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <button class="admin-btn admin-btn-primary"
+                        @onclick="Assign"
+                        disabled="@(!_canAssign)">
+                    Assign
+                </button>
+                <button class="admin-btn" @onclick="HideAssign">Cancel</button>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_assignError))
+            {
+                <div class="admin-error" style="margin-top:10px;">❌ @_assignError</div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private bool _loading;
+    private string _search = "";
+
+    private List<AdminSubscriptionRow> _items = new();
+    private List<AdminPlanRow> _plans = new();
+
+    private bool _showAssign;
+    private AssignRequest _assign = new();
+    private string _assignPeriodEndLocal = "";
+    private string? _assignError;
+
+    private string _userSearch = "";
+    private List<UserPick> _userResults = new();
+#pragma warning disable CS0169
+    private UserPick? _selectedUser;
+#pragma warning restore CS0169
+
+    private EditRequest? _editing;
+    private string _editingPeriodEndLocal = "";
+
+    private bool _showCancelConfirm;
+    private AdminSubscriptionRow? _cancelTarget;
+    private bool _cancelImmediate;
+
+    private bool _canAssign => _assign.UserId > 0 && _assign.PlanId > 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Refresh();
+        await LoadPlans();
+    }
+
+    private async Task Refresh()
+    {
+        _loading = true;
+        var res = await Http.GetFromJsonAsync<ListResponse>("api/admin/subscriptions");
+        _items = res?.Items ?? new();
+        _loading = false;
+    }
+
+    private async Task LoadPlans()
+    {
+        var all = await Http.GetFromJsonAsync<List<AdminPlanRow>>("api/admin/subscriptions/plans") ?? new();
+        _plans = all.GroupBy(p => p.Id).Select(g => g.First()).ToList();
+    }
+
+
+
+    private void OnEditPlanChanged(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var planId))
+            return;
+
+        _editing!.PlanId = planId;
+
+        var plan = _plans.FirstOrDefault(p => p.Id == planId);
+        if (plan == null)
+            return;
+
+        _editing.PlanTier = plan.PlanTier;
+        _editing.IsUnlimited =
+            plan.PlanTier.Contains("UNLIMITED", StringComparison.OrdinalIgnoreCase);
+    }
+
+
+    private void HideAssign()
+    {
+        _showAssign = false;
+        _assignError = null;
+        _userResults.Clear();
+    }
+
+    private void OnAssignPeriodEndChanged(ChangeEventArgs e)
+    {
+        _assignPeriodEndLocal = e.Value?.ToString() ?? "";
+    }
+
+
+    private IEnumerable<AdminSubscriptionRow> Filtered()
+    {
+        if (string.IsNullOrWhiteSpace(_search)) return _items;
+        var s = _search.ToLowerInvariant();
+        return _items.Where(x =>
+            x.UserName.ToLowerInvariant().Contains(s) ||
+            x.PlanName.ToLowerInvariant().Contains(s) ||
+            x.SubscriptionId.ToLowerInvariant().Contains(s));
+    }
+
+    private void ShowAssign()
+    {
+        _editing = null;
+        _showCancelConfirm = false;
+        _showAssign = true;
+
+        _assign = new AssignRequest { Status = "active" };
+        _assignPeriodEndLocal = ToLocalInput(DateTime.UtcNow.AddDays(30));
+        _userSearch = "";
+        _userResults.Clear();
+    }
+
+    private void Edit(AdminSubscriptionRow s)
+    {
+        _showAssign = false;
+        _assignError = null;
+
+        _editing = new EditRequest
+        {
+            Id = s.Id,
+
+            UserId = s.UserId,
+            UserName = s.UserName,
+
+            // UI DOES NOT HAVE Email / PlanId / PriceId → DO NOT SET THEM
+            PlanTier = s.PlanTier,
+            IsUnlimited = s.PlanTier == "UNLIMITED",
+
+            SubscriptionId = s.SubscriptionId,
+            Status = s.Status,
+            CurrentPeriodEndUtc = s.CurrentPeriodEndUtc
+        };
+
+        _editingPeriodEndLocal = ToLocalInput(s.CurrentPeriodEndUtc);
+    }
+
+
+
+
+    private async Task SaveEdit()
+    {
+        _editing!.CurrentPeriodEndUtc =
+            FromLocalInput(_editingPeriodEndLocal);
+
+        await Http.PostAsJsonAsync(
+            "api/admin/subscriptions/update",
+            _editing
+        );
+
+        _editing = null;
+
+        // 1️⃣ Refresh admin table
+        await Refresh();
+
+        // 2️⃣ Refresh CURRENT logged-in user session (uses existing method)
+        await Session.RefreshUserAsync();
+
+        // 3️⃣ Notify UI listeners (top bar, plan badge, etc.)
+        Session.NotifyPlanChanged();
+    }
+
+
+
+    private void CancelEdit() => _editing = null;
+
+    private void ShowCancelConfirm(AdminSubscriptionRow s)
+    {
+        _editing = null;
+        _showAssign = false;
+        _cancelTarget = s;
+        _showCancelConfirm = true;
+        _cancelImmediate = false;
+    }
+
+    private async Task ConfirmCancel()
+    {
+        await Http.PostAsJsonAsync(
+            "api/admin/subscriptions/cancel",
+            new { Id = _cancelTarget!.Id, Immediate = _cancelImmediate });
+
+        _showCancelConfirm = false;
+        _cancelTarget = null;
+        await Refresh();
+    }
+
+    private void HideCancelConfirm()
+    {
+        _showCancelConfirm = false;
+        _cancelTarget = null;
+    }
+
+    private async Task Assign()
+    {
+        _assign.CurrentPeriodEndUtc =
+            FromLocalInput(_assignPeriodEndLocal) ?? DateTime.UtcNow.AddDays(30);
+
+        await Http.PostAsJsonAsync("api/admin/subscriptions/assign", _assign);
+        _showAssign = false;
+        await Refresh();
+    }
+
+    private async Task OnUserInput(ChangeEventArgs e)
+    {
+        _userSearch = e.Value?.ToString() ?? "";
+        _userResults = string.IsNullOrWhiteSpace(_userSearch)
+            ? new()
+            : await Http.GetFromJsonAsync<List<UserPick>>(
+                $"api/admin/users/search?q={Uri.EscapeDataString(_userSearch)}") ?? new();
+    }
+
+    private void SelectUser(UserPick u)
+    {
+        _assign.UserId = u.Id;
+        _userSearch = u.Display;
+        _userResults.Clear();
+    }
+
+    private static string ToLocalInput(DateTime utc)
+        => utc.ToLocalTime().ToString("yyyy-MM-ddTHH:mm");
+
+    private static DateTime? FromLocalInput(string local)
+        => DateTime.TryParse(local, out var d) ? d.ToUniversalTime() : null;
+
+    private static string StatusPillClass(string s)
+        => s == "active" ? "pill-active" : "pill-canceled";
+
+    private static string StatusIcon(string s)
+        => s == "active" ? "✅" : "❌";
+
+    private sealed class EditRequest
+    {
+        public int Id { get; set; }
+
+        public int UserId { get; set; }
+        public string UserName { get; set; } = "";
+        public string Email { get; set; } = "";
+
+        public int PlanId { get; set; }
+        public string PlanTier { get; set; } = "";
+        public bool IsUnlimited { get; set; }
+
+        public string SubscriptionId { get; set; } = "";
+        public string PriceId { get; set; } = "";
+
+        public string Status { get; set; } = "";
+        public DateTime? CurrentPeriodEndUtc { get; set; }
+    }
+
+
+    private sealed class AssignRequest
+    {
+        public int UserId { get; set; }
+        public int PlanId { get; set; }
+        public string Status { get; set; } = "active";
+        public DateTime CurrentPeriodEndUtc { get; set; }
+    }
+
+    private sealed class AdminPlanRow
+    {
+        public int Id { get; set; }
+        public string PlanName { get; set; } = "";
+        public string PlanTier { get; set; } = "";
+        public int Credits { get; set; }
+
+        public string DisplayName =>
+            !string.IsNullOrWhiteSpace(PlanName)
+                ? PlanName
+                : Credits > 0 ? $"Credits ({Credits})" : PlanTier;
+    }
+
+    private sealed class AdminSubscriptionRow
+    {
+        public int Id { get; set; }
+        public int UserId { get; set; }
+        public string UserName { get; set; } = "";
+        public string PlanName { get; set; } = "";
+        public string PlanTier { get; set; } = "";
+        public string Status { get; set; } = "";
+        public string SubscriptionId { get; set; } = "";
+        public DateTime CurrentPeriodEndUtc { get; set; }
+    }
+
+    private sealed class ListResponse
+    {
+        public List<AdminSubscriptionRow>? Items { get; set; }
+    }
+
+    private sealed class UserPick
+    {
+        public int Id { get; set; }
+        public string Username { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Display => $"{Id} - {Username} ({Email})";
+    }
+}
+
+<style>
+    .pill-active { background: rgba(16, 185, 129, 0.15) !important; color: #10b981 !important; border-color: rgba(16, 185, 129, 0.3) !important; }
+    .pill-canceled { background: rgba(239, 68, 68, 0.15) !important; color: #ef4444 !important; border-color: rgba(239, 68, 68, 0.3) !important; }
+    .pill-warning { background: rgba(245, 158, 11, 0.15) !important; color: #f59e0b !important; border-color: rgba(245, 158, 11, 0.3) !important; }
+    .pill-trial { background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15)) !important; color: var(--primary-500) !important; border-color: rgba(59, 130, 246, 0.3) !important; }
+</style>

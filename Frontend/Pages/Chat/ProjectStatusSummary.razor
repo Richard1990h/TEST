@@ -1,0 +1,27 @@
+@using Microsoft.AspNetCore.Components
+@using LittleHelperAI.Frontend.Pages.Chat.Models
+
+
+@if (Status != null)
+{
+    <div class="project-status-summary">
+        <span class="status-icon">✅</span>
+
+        <span class="status-text">
+            @Status.Title · @Status.Progress% · @Status.CurrentStep
+        </span>
+
+        <button class="trace-toggle"
+                @onclick="OnToggleTrace">
+            ▸ View details
+        </button>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public ProjectStatus? Status { get; set; }
+
+    [Parameter]
+    public EventCallback OnToggleTrace { get; set; }
+}

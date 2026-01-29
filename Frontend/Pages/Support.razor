@@ -1,0 +1,539 @@
+@page "/support"
+@page "/support/ticket/{TicketId:int}"
+@inject UserSessionService Session
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@using LittleHelperAI.Shared.Models
+
+<PageTitle>Support</PageTitle>
+
+<style>
+    .support-wrapper {
+        min-height: 100vh;
+        background: var(--bg-canvas);
+        padding: 2rem 1.5rem;
+        display: flex;
+        justify-content: center;
+        overflow-y: auto;
+    }
+
+    .support-content {
+        width: 100%;
+        max-width: 900px;
+    }
+
+    .support-header {
+        margin-bottom: 2rem;
+    }
+
+    .support-header h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--text-primary) 0%, var(--primary-500) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .support-header p {
+        color: var(--text-secondary);
+        margin-top: 0.5rem;
+    }
+
+    .support-card {
+        background: var(--bg-glass);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        padding: 1.5rem;
+        border: 1px solid var(--border-default);
+        margin-bottom: 1.5rem;
+    }
+
+    .support-card h2 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .ticket-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .ticket-item {
+        padding: 1rem;
+        border-radius: 12px;
+        border: 1px solid var(--border-default);
+        background: var(--bg-secondary);
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .ticket-item:hover {
+        border-color: var(--primary-500);
+        transform: translateX(4px);
+    }
+
+    .ticket-item-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.5rem;
+    }
+
+    .ticket-subject {
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .ticket-status {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 6px;
+        font-weight: 600;
+    }
+
+    .status-open { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+    .status-in_progress { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+    .status-resolved { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; }
+    .status-closed { background: rgba(107, 114, 128, 0.15); color: #6b7280; }
+
+    .ticket-meta {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .form-input, .form-textarea, .form-select {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--border-default);
+        border-radius: 10px;
+        background: var(--input-bg);
+        color: var(--text-primary);
+        font-size: 0.95rem;
+        transition: all 0.2s ease;
+    }
+
+    .form-input:focus, .form-textarea:focus, .form-select:focus {
+        outline: none;
+        border-color: var(--primary-500);
+        box-shadow: var(--shadow-focus);
+    }
+
+    .form-textarea {
+        resize: vertical;
+        min-height: 100px;
+    }
+
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: none;
+    }
+
+    .btn-primary {
+        background: var(--btn-primary-bg);
+        color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-secondary {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-default);
+    }
+
+    .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .reply-thread {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-top: 1rem;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .reply-item {
+        padding: 0.75rem 1rem;
+        border-radius: 10px;
+        border: 1px solid var(--border-default);
+    }
+
+    .reply-item.admin {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(139, 92, 246, 0.08));
+        border-color: rgba(59, 130, 246, 0.2);
+    }
+
+    .reply-item.user {
+        background: var(--bg-tertiary);
+    }
+
+    .reply-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        font-size: 0.8rem;
+    }
+
+    .reply-sender {
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .reply-time {
+        color: var(--text-secondary);
+    }
+
+    .reply-message {
+        white-space: pre-wrap;
+        color: var(--text-primary);
+        font-size: 0.9rem;
+    }
+
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--primary-500);
+        text-decoration: none;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        cursor: pointer;
+    }
+
+    .back-link:hover {
+        text-decoration: underline;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 2rem;
+        color: var(--text-secondary);
+    }
+</style>
+
+<div class="support-wrapper">
+    <div class="support-content">
+        <div class="support-header">
+            <h1>🎫 Support Center</h1>
+            <p>Need help? Submit a ticket and our team will assist you.</p>
+        </div>
+
+        @if (TicketId.HasValue && _selectedTicket is not null)
+        {
+            <!-- Ticket Detail View -->
+            <span class="back-link" @onclick="BackToList">← Back to tickets</span>
+
+            <div class="support-card">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+                    <div>
+                        <h2 style="margin:0;">@_selectedTicket.Subject</h2>
+                        <div style="margin-top:0.5rem;">
+                            <span class="ticket-status status-@_selectedTicket.Status">@_selectedTicket.Status.Replace("_", " ")</span>
+                        </div>
+                    </div>
+                    <div style="text-align:right; font-size:0.85rem; color:var(--text-secondary);">
+                        <div>Created: @_selectedTicket.CreatedAt.ToString("MMM dd, yyyy HH:mm")</div>
+                        @if (_selectedTicket.UpdatedAt.HasValue)
+                        {
+                            <div>Updated: @_selectedTicket.UpdatedAt.Value.ToString("MMM dd, yyyy HH:mm")</div>
+                        }
+                    </div>
+                </div>
+
+                <div style="margin-top:1rem; padding:1rem; background:var(--bg-tertiary); border-radius:10px;">
+                    <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.5rem;">Original Message</div>
+                    <div style="white-space:pre-wrap;">@_selectedTicket.Message</div>
+                </div>
+
+                <div class="reply-thread">
+                    @foreach (var reply in _replies)
+                    {
+                        <div class="reply-item @(reply.IsAdminReply ? "admin" : "user")">
+                            <div class="reply-header">
+                                <span class="reply-sender">@(reply.IsAdminReply ? "👑 Support Team" : "👤 You")</span>
+                                <span class="reply-time">@reply.CreatedAt.ToString("MMM dd, HH:mm")</span>
+                            </div>
+                            <div class="reply-message">@reply.Message</div>
+                        </div>
+                    }
+                </div>
+
+                @if (_selectedTicket.Status != "closed" && _selectedTicket.Status != "resolved")
+                {
+                    <div style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--border-default);">
+                        <div class="form-group">
+                            <label>Your Reply</label>
+                            <textarea class="form-textarea" @bind="_replyMessage" placeholder="Type your message..."></textarea>
+                        </div>
+                        <button class="btn btn-primary" @onclick="SendReply" disabled="@_sendingReply">
+                            @(_sendingReply ? "Sending..." : "📤 Send Reply")
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div style="margin-top:1rem; padding:1rem; background:rgba(107, 114, 128, 0.1); border-radius:10px; text-align:center; color:var(--text-secondary);">
+                        This ticket is @_selectedTicket.Status. If you need further assistance, please create a new ticket.
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_ticketError))
+                {
+                    <div style="margin-top:1rem; padding:1rem; background:rgba(239, 68, 68, 0.1); border-radius:10px; color:#ef4444;">@_ticketError</div>
+                }
+            </div>
+        }
+        else
+        {
+            <!-- Ticket List + Create Form -->
+            <div class="support-card">
+                <h2>📝 Create New Ticket</h2>
+
+                <div class="form-group">
+                    <label>Subject</label>
+                    <input class="form-input" @bind="_newSubject" placeholder="Brief description of your issue" />
+                </div>
+
+                <div class="form-group">
+                    <label>Priority</label>
+                    <select class="form-select" @bind="_newPriority">
+                        <option value="low">Low</option>
+                        <option value="normal">Normal</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Message</label>
+                    <textarea class="form-textarea" @bind="_newMessage" placeholder="Describe your issue in detail..."></textarea>
+                </div>
+
+                <button class="btn btn-primary" @onclick="CreateTicket" disabled="@_creating">
+                    @(_creating ? "Creating..." : "🎫 Submit Ticket")
+                </button>
+
+                @if (!string.IsNullOrWhiteSpace(_createError))
+                {
+                    <div style="margin-top:1rem; padding:1rem; background:rgba(239, 68, 68, 0.1); border-radius:10px; color:#ef4444;">@_createError</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_createSuccess))
+                {
+                    <div style="margin-top:1rem; padding:1rem; background:rgba(16, 185, 129, 0.1); border-radius:10px; color:#10b981;">@_createSuccess</div>
+                }
+            </div>
+
+            <div class="support-card">
+                <h2>📋 My Tickets</h2>
+
+                @if (_loadingTickets)
+                {
+                    <div class="empty-state">Loading...</div>
+                }
+                else if (_tickets.Count == 0)
+                {
+                    <div class="empty-state">No tickets yet. Create one above!</div>
+                }
+                else
+                {
+                    <div class="ticket-list">
+                        @foreach (var ticket in _tickets)
+                        {
+                            <div class="ticket-item" @onclick="() => ViewTicket(ticket.Id)">
+                                <div class="ticket-item-header">
+                                    <span class="ticket-subject">@ticket.Subject</span>
+                                    <span class="ticket-status status-@ticket.Status">@ticket.Status.Replace("_", " ")</span>
+                                </div>
+                                <div class="ticket-meta">
+                                    @ticket.CreatedAt.ToString("MMM dd, yyyy") • @ticket.ReplyCount replies
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public int? TicketId { get; set; }
+
+    private bool _loadingTickets = true;
+    private List<SupportTicketDto> _tickets = new();
+
+    // Create form
+    private string _newSubject = "";
+    private string _newMessage = "";
+    private string _newPriority = "normal";
+    private bool _creating;
+    private string? _createError;
+    private string? _createSuccess;
+
+    // Detail view
+    private SupportTicketDto? _selectedTicket;
+    private List<SupportTicketReplyDto> _replies = new();
+    private string _replyMessage = "";
+    private bool _sendingReply;
+    private string? _ticketError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTickets();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (TicketId.HasValue)
+        {
+            await LoadTicketDetail(TicketId.Value);
+        }
+        else
+        {
+            _selectedTicket = null;
+            _replies = new();
+        }
+    }
+
+    private async Task LoadTickets()
+    {
+        _loadingTickets = true;
+        try
+        {
+            _tickets = await Http.GetFromJsonAsync<List<SupportTicketDto>>("api/support/my-tickets") ?? new();
+        }
+        catch { }
+        finally
+        {
+            _loadingTickets = false;
+        }
+    }
+
+    private async Task LoadTicketDetail(int ticketId)
+    {
+        _ticketError = null;
+        try
+        {
+            // Find ticket in list first
+            _selectedTicket = _tickets.FirstOrDefault(t => t.Id == ticketId);
+            if (_selectedTicket is null)
+            {
+                await LoadTickets();
+                _selectedTicket = _tickets.FirstOrDefault(t => t.Id == ticketId);
+            }
+
+            _replies = await Http.GetFromJsonAsync<List<SupportTicketReplyDto>>($"api/support/ticket/{ticketId}/replies") ?? new();
+        }
+        catch (Exception ex)
+        {
+            _ticketError = ex.Message;
+        }
+    }
+
+    private async Task CreateTicket()
+    {
+        _createError = null;
+        _createSuccess = null;
+
+        if (string.IsNullOrWhiteSpace(_newSubject) || string.IsNullOrWhiteSpace(_newMessage))
+        {
+            _createError = "Subject and message are required.";
+            return;
+        }
+
+        _creating = true;
+        try
+        {
+            var resp = await Http.PostAsJsonAsync("api/support/create", new { subject = _newSubject, message = _newMessage, priority = _newPriority });
+            if (resp.IsSuccessStatusCode)
+            {
+                _createSuccess = "Ticket created successfully!";
+                _newSubject = "";
+                _newMessage = "";
+                _newPriority = "normal";
+                await LoadTickets();
+            }
+            else
+            {
+                _createError = await resp.Content.ReadAsStringAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _createError = ex.Message;
+        }
+        finally
+        {
+            _creating = false;
+        }
+    }
+
+    private async Task SendReply()
+    {
+        if (_selectedTicket is null || string.IsNullOrWhiteSpace(_replyMessage)) return;
+
+        _ticketError = null;
+        _sendingReply = true;
+        try
+        {
+            var resp = await Http.PostAsJsonAsync($"api/support/ticket/{_selectedTicket.Id}/reply", new { message = _replyMessage });
+            if (resp.IsSuccessStatusCode)
+            {
+                _replyMessage = "";
+                await LoadTicketDetail(_selectedTicket.Id);
+            }
+            else
+            {
+                _ticketError = await resp.Content.ReadAsStringAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _ticketError = ex.Message;
+        }
+        finally
+        {
+            _sendingReply = false;
+        }
+    }
+
+    private void ViewTicket(int ticketId)
+    {
+        Navigation.NavigateTo($"/support/ticket/{ticketId}");
+    }
+
+    private void BackToList()
+    {
+        Navigation.NavigateTo("/support");
+    }
+}

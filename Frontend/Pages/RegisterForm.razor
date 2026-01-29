@@ -1,0 +1,600 @@
+@page "/register"
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@inject UserSessionService Session
+@inject IJSRuntime JS
+
+<style>
+    /* ============================================
+       CYBERPUNK REGISTER FORM STYLES - Theme Support
+       ============================================ */
+    
+    .cyber-auth-wrapper {
+        min-height: 100vh;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-canvas);
+        padding: 1.5rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    [data-theme="dark"] .cyber-auth-wrapper::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: 
+            radial-gradient(ellipse at 70% 20%, rgba(0, 255, 136, 0.05) 0%, transparent 50%),
+            radial-gradient(ellipse at 30% 80%, rgba(0, 240, 255, 0.05) 0%, transparent 50%);
+        pointer-events: none;
+    }
+
+    [data-theme="dark"] .cyber-auth-wrapper::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: 
+            linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+        background-size: 40px 40px;
+        pointer-events: none;
+    }
+
+    .auth-theme-toggle {
+        position: fixed;
+        top: 1.5rem;
+        right: 1.5rem;
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        transition: all 0.2s ease;
+        z-index: 9999;
+    }
+
+    .auth-theme-toggle:hover {
+        border-color: var(--cyber-green);
+        background: var(--bg-hover);
+    }
+
+    [data-theme="dark"] .auth-theme-toggle:hover {
+        box-shadow: 0 0 15px var(--cyber-green-glow);
+    }
+
+    .cyber-register-container {
+        background: var(--bg-glass);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        border: 1px solid var(--border-color);
+        padding: 2.5rem;
+        width: 100%;
+        max-width: 500px;
+        position: relative;
+        animation: containerFadeIn 0.5s ease-out;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .cyber-register-container:hover {
+        border-color: var(--border-glow);
+    }
+
+    [data-theme="dark"] .cyber-register-container:hover {
+        box-shadow: 0 0 40px rgba(0, 255, 136, 0.1);
+    }
+
+    .cyber-register-container::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--gradient-button);
+        background-size: 200% 100%;
+        animation: gradientFlow 3s linear infinite;
+        border-radius: 16px 16px 0 0;
+    }
+
+    @@keyframes containerFadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @@keyframes gradientFlow {
+        0% { background-position: 0% 50%; }
+        100% { background-position: 200% 50%; }
+    }
+
+    .cyber-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .cyber-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .cyber-title-accent {
+        background: var(--gradient-primary);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .cyber-subtitle {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+    }
+
+    .cyber-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: var(--cyber-cyan-glow);
+        border: 1px solid var(--cyber-cyan-dim);
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-family: var(--font-mono);
+        color: var(--cyber-cyan);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-top: 1rem;
+    }
+
+    .cyber-status-dot {
+        width: 6px;
+        height: 6px;
+        background: var(--cyber-cyan);
+        border-radius: 50%;
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .cyber-error {
+        background: rgba(255, 51, 51, 0.1);
+        border: 1px solid rgba(255, 51, 51, 0.3);
+        color: var(--cyber-red);
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        margin-bottom: 1.5rem;
+        font-family: var(--font-mono);
+    }
+
+    .cyber-form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+
+    .cyber-form-group {
+        margin-bottom: 0.5rem;
+    }
+
+    .cyber-form-group.full-width {
+        grid-column: span 2;
+    }
+
+    .cyber-label {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.65rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        color: var(--cyber-green);
+        margin-bottom: 0.5rem;
+    }
+
+    .cyber-input-wrapper {
+        position: relative;
+    }
+
+    .cyber-input {
+        width: 100%;
+        background: var(--input-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        font-family: var(--font-sans);
+        font-size: 0.9rem;
+        color: var(--text-primary);
+        transition: all 0.2s ease;
+    }
+
+    .cyber-input::placeholder {
+        color: var(--text-muted);
+    }
+
+    .cyber-input:focus {
+        outline: none;
+        border-color: var(--cyber-green);
+        box-shadow: 0 0 0 3px var(--cyber-green-glow);
+    }
+
+    [data-theme="dark"] .cyber-input:focus {
+        box-shadow: 0 0 0 3px var(--cyber-green-glow), 0 0 20px rgba(0, 255, 136, 0.1);
+    }
+
+    .cyber-input-icon {
+        position: absolute;
+        right: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 1rem;
+        transition: color 0.2s ease;
+    }
+
+    .cyber-input-icon:hover {
+        color: var(--cyber-green);
+    }
+
+    .cyber-strength-meter {
+        margin-top: 0.5rem;
+        height: 4px;
+        background: var(--border-color);
+        border-radius: 2px;
+        overflow: hidden;
+    }
+
+    .cyber-strength-bar {
+        height: 100%;
+        transition: width 0.3s ease, background 0.3s ease;
+    }
+
+    .cyber-btn {
+        width: 100%;
+        background: var(--gradient-button);
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 0.95rem;
+        padding: 0.875rem 1.5rem;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-top: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    [data-theme="dark"] .cyber-btn {
+        color: #0a0a0f;
+    }
+
+    .cyber-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px var(--cyber-green-glow);
+    }
+
+    .cyber-btn:active:not(:disabled) {
+        transform: translateY(0);
+    }
+
+    .cyber-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .cyber-footer {
+        text-align: center;
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .cyber-footer-text {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+    }
+
+    .cyber-footer-link {
+        color: var(--cyber-cyan);
+        text-decoration: none;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .cyber-footer-link:hover {
+        color: var(--cyber-green);
+    }
+
+    [data-theme="dark"] .cyber-footer-link:hover {
+        text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+    }
+
+    @@media (max-width: 560px) {
+        .cyber-form-grid {
+            grid-template-columns: 1fr;
+        }
+        .cyber-form-group.full-width {
+            grid-column: span 1;
+        }
+        .cyber-register-container {
+            padding: 1.75rem;
+        }
+    }
+</style>
+
+<div class="cyber-auth-wrapper">
+    <!-- Theme Toggle -->
+    <button class="auth-theme-toggle" @onclick="ToggleTheme" title="Toggle theme">
+        @(currentTheme == "dark" ? "☀️" : "🌙")
+    </button>
+
+    <div class="cyber-register-container">
+        <div class="cyber-header">
+            <h2 class="cyber-title">
+                <span class="cyber-title-accent">AGENT REGISTRATION</span>
+            </h2>
+            <p class="cyber-subtitle">Initialize your neural profile</p>
+            <div class="cyber-status">
+                <span class="cyber-status-dot"></span>
+                SECURE CHANNEL
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div class="cyber-error">
+                ⚠ @ErrorMessage
+            </div>
+        }
+
+        <div class="cyber-form-grid">
+            <div class="cyber-form-group">
+                <label class="cyber-label" for="firstName">FIRST_NAME</label>
+                <input id="firstName" class="cyber-input" placeholder="Enter first name" @bind="Model.FirstName" />
+            </div>
+
+            <div class="cyber-form-group">
+                <label class="cyber-label" for="lastName">LAST_NAME</label>
+                <input id="lastName" class="cyber-input" placeholder="Enter last name" @bind="Model.LastName" />
+            </div>
+
+            <div class="cyber-form-group full-width">
+                <label class="cyber-label" for="username">AGENT_ID</label>
+                <input id="username" class="cyber-input" placeholder="Choose your agent ID" @bind="Model.Username" />
+            </div>
+
+            <div class="cyber-form-group full-width">
+                <label class="cyber-label" for="email">EMAIL_ADDRESS</label>
+                <input id="email" class="cyber-input" placeholder="your@email.com" @bind="Model.Email" />
+            </div>
+
+            <div class="cyber-form-group full-width">
+                <label class="cyber-label" for="password">SECURITY_KEY</label>
+                <div class="cyber-input-wrapper">
+                    <input id="password" class="cyber-input" placeholder="Create security key" type="@PasswordInputType" @bind="Model.Password" @oninput="CheckPasswordStrength" />
+                    <span class="cyber-input-icon" @onclick="TogglePassword">
+                        @(ShowPassword ? "👁" : "🔒")
+                    </span>
+                </div>
+                <div class="cyber-strength-meter">
+                    <div class="cyber-strength-bar" style="width:@PasswordStrength%; background:@StrengthColor;"></div>
+                </div>
+            </div>
+
+            <div class="cyber-form-group full-width">
+                <label class="cyber-label" for="confirmPassword">CONFIRM_KEY</label>
+                <div class="cyber-input-wrapper">
+                    <input id="confirmPassword" class="cyber-input" placeholder="Confirm security key" type="@ConfirmInputType" @bind="Model.ConfirmPassword" />
+                    <span class="cyber-input-icon" @onclick="ToggleConfirmPassword">
+                        @(ShowConfirm ? "👁" : "🔒")
+                    </span>
+                </div>
+            </div>
+
+            <!-- 🎁 Referral Code Field -->
+            <div class="cyber-form-group full-width">
+                <label class="cyber-label" for="referralCode">REFERRAL_CODE (Optional)</label>
+                <div class="cyber-input-wrapper">
+                    <input id="referralCode" class="cyber-input" placeholder="Enter referral code for bonus credits" @bind="Model.ReferralCode" @onblur="ValidateReferralCode" style="@(referralValid ? "border-color: var(--cyber-green);" : "")" />
+                    @if (referralValid)
+                    {
+                        <span class="cyber-input-icon" style="color: var(--cyber-green);">✓</span>
+                    }
+                </div>
+                @if (!string.IsNullOrEmpty(referralMessage))
+                {
+                    <div style="margin-top: 0.5rem; font-size: 0.8rem; color: @(referralValid ? "var(--cyber-green)" : "var(--cyber-cyan)");">
+                        @referralMessage
+                    </div>
+                }
+            </div>
+        </div>
+
+        <button class="cyber-btn" @onclick="HandleRegister">
+            [ INITIATE REGISTRATION ]
+        </button>
+
+        <div class="cyber-footer">
+            <p class="cyber-footer-text">
+                Already an operative? 
+                <a class="cyber-footer-link" @onclick="@(() => Navigation.NavigateTo("/"))">Access Terminal</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnRegisterSuccess { get; set; }
+
+    private RegisterRequest Model = new();
+    private string? ErrorMessage;
+    private string currentTheme = "dark";
+
+    private bool ShowPassword = false;
+    private bool ShowConfirm = false;
+
+    private string PasswordInputType => ShowPassword ? "text" : "password";
+    private string ConfirmInputType => ShowConfirm ? "text" : "password";
+
+    private int PasswordStrength = 0;
+    private string StrengthColor = "transparent";
+
+    // 🎁 Referral validation state
+    private bool referralValid = false;
+    private string? referralMessage;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                currentTheme = await JS.InvokeAsync<string>("themeManager.getTheme") ?? "dark";
+                StateHasChanged();
+            }
+            catch { }
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        currentTheme = currentTheme == "dark" ? "light" : "dark";
+        try
+        {
+            await JS.InvokeVoidAsync("themeManager.setTheme", currentTheme);
+        }
+        catch { }
+        StateHasChanged();
+    }
+
+    private void TogglePassword() => ShowPassword = !ShowPassword;
+    private void ToggleConfirmPassword() => ShowConfirm = !ShowConfirm;
+
+    private void CheckPasswordStrength(ChangeEventArgs e)
+    {
+        var password = e.Value?.ToString() ?? "";
+        if (password.Length == 0) PasswordStrength = 0;
+        else if (password.Length < 4) PasswordStrength = 20;
+        else if (password.Length < 6) PasswordStrength = 40;
+        else if (password.Length < 8) PasswordStrength = 60;
+        else if (password.Length < 10) PasswordStrength = 80;
+        else PasswordStrength = 100;
+
+        StrengthColor = PasswordStrength switch
+        {
+            <= 40 => "var(--cyber-red)",
+            <= 60 => "#ff9900",
+            <= 80 => "var(--cyber-yellow)",
+            _ => "var(--cyber-green)"
+        };
+    }
+
+    // 🎁 Validate referral code
+    private async Task ValidateReferralCode()
+    {
+        referralValid = false;
+        referralMessage = null;
+
+        if (string.IsNullOrWhiteSpace(Model.ReferralCode))
+            return;
+
+        try
+        {
+            var response = await AuthService.Http.GetAsync($"api/referral/validate/{Model.ReferralCode}");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ReferralValidationResult>();
+                if (result?.Valid == true)
+                {
+                    referralValid = true;
+                    referralMessage = $"🎁 {result.Message}";
+                }
+                else
+                {
+                    referralMessage = "⚠ Invalid referral code";
+                }
+            }
+            else
+            {
+                referralMessage = "⚠ Invalid referral code";
+            }
+        }
+        catch
+        {
+            referralMessage = "⚠ Could not validate code";
+        }
+        StateHasChanged();
+    }
+
+    private class ReferralValidationResult
+    {
+        public bool Valid { get; set; }
+        public string? ReferrerUsername { get; set; }
+        public double BonusCredits { get; set; }
+        public string? Message { get; set; }
+    }
+
+    private async Task HandleRegister()
+    {
+        ErrorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(Model.FirstName) || string.IsNullOrWhiteSpace(Model.LastName) ||
+            string.IsNullOrWhiteSpace(Model.Username) || string.IsNullOrWhiteSpace(Model.Email) ||
+            string.IsNullOrWhiteSpace(Model.Password) || string.IsNullOrWhiteSpace(Model.ConfirmPassword))
+        {
+            ErrorMessage = "All fields are required.";
+            return;
+        }
+
+        if (Model.Password != Model.ConfirmPassword)
+        {
+            ErrorMessage = "Security keys do not match.";
+            return;
+        }
+
+        try
+        {
+            var result = await AuthService.Register(Model);
+            if (!string.IsNullOrEmpty(result))
+            {
+                ErrorMessage = result;
+            }
+            else
+            {
+                var loginResult = await AuthService.Login(new LoginRequest { Identifier = Model.Username, Password = Model.Password });
+                if (loginResult?.User != null)
+                {
+                    await Session.SetUserAsync(loginResult.User);
+                    if (OnRegisterSuccess.HasDelegate) await OnRegisterSuccess.InvokeAsync();
+                    Navigation.NavigateTo("/");
+                }
+                else
+                {
+                    ErrorMessage = "Registration successful, but auto-login failed.";
+                }
+            }
+        }
+        catch
+        {
+            ErrorMessage = "An error occurred during registration.";
+        }
+    }
+}

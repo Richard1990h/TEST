@@ -1,0 +1,11 @@
+@page "/admin/management"
+@inject NavigationManager Navigation
+
+<PageTitle>Redirecting...</PageTitle>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Navigation.NavigateTo("/admin/panel", replace: true);
+    }
+}

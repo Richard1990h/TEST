@@ -1,0 +1,11 @@
+{
+  "name": "frontend-proxy",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node proxy.js"
+  },
+  "dependencies": {
+    "http-proxy": "^1.18.1",
+    "express": "^4.18.2"
+  }
+}

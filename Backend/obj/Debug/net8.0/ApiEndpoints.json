@@ -1,0 +1,1873 @@
+[
+  {
+    "ContainingType": "Program\u002B\u003C\u003Ec",
+    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_9",
+    "RelativePath": "",
+    "HttpMethod": "GET",
+    "IsController": false,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.String",
+        "MediaTypes": [
+          "text/plain"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AccountController",
+    "Method": "ChangePassword",
+    "RelativePath": "api/account/change-password",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "LittleHelperAI.Backend.Controllers.ChangePasswordRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AccountController",
+    "Method": "VerifyPassword",
+    "RelativePath": "api/account/verify-password",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "LittleHelperAI.Backend.Controllers.VerifyPasswordRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminAuditController",
+    "Method": "List",
+    "RelativePath": "api/admin/audit",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "q",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "take",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "skip",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminMetricsController",
+    "Method": "GetCircuitBreakerStatus",
+    "RelativePath": "api/admin/circuit-breaker",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminDbController",
+    "Method": "GetTable",
+    "RelativePath": "api/admin/db/table/{table}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "table",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "take",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "skip",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "q",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminDbController",
+    "Method": "Insert",
+    "RelativePath": "api/admin/db/table/{table}",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "table",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "body",
+        "Type": "System.Text.Json.JsonElement",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminDbController",
+    "Method": "Update",
+    "RelativePath": "api/admin/db/table/{table}/{id}",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "table",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "id",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "body",
+        "Type": "System.Text.Json.JsonElement",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminDbController",
+    "Method": "Delete",
+    "RelativePath": "api/admin/db/table/{table}/{id}",
+    "HttpMethod": "DELETE",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "table",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "id",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminDbController",
+    "Method": "Tables",
+    "RelativePath": "api/admin/db/tables",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminMetricsController",
+    "Method": "DismissDeadLetter",
+    "RelativePath": "api/admin/dead-letter/{id}/dismiss",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "request",
+        "Type": "LittleHelperAI.Backend.Controllers.DismissRequest",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminMetricsController",
+    "Method": "GetPendingDeadLetters",
+    "RelativePath": "api/admin/dead-letter/pending",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "limit",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminMetricsController",
+    "Method": "GetDeadLetterSummary",
+    "RelativePath": "api/admin/dead-letter/summary",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminKnowledgeController",
+    "Method": "ListEntries",
+    "RelativePath": "api/admin/knowledge/entries",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "q",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "take",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "skip",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminKnowledgeController",
+    "Method": "UpsertEntry",
+    "RelativePath": "api/admin/knowledge/entries",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "entry",
+        "Type": "LittleHelperAI.Shared.Models.KnowledgeEntry",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminKnowledgeController",
+    "Method": "DeleteEntry",
+    "RelativePath": "api/admin/knowledge/entries/{id}",
+    "HttpMethod": "DELETE",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminKnowledgeController",
+    "Method": "ListLearned",
+    "RelativePath": "api/admin/knowledge/learned",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "q",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "take",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "skip",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminKnowledgeController",
+    "Method": "DeleteLearned",
+    "RelativePath": "api/admin/knowledge/learned/{id}",
+    "HttpMethod": "DELETE",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminMetricsController",
+    "Method": "GetMetrics",
+    "RelativePath": "api/admin/metrics",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "windowMinutes",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminNotificationsController",
+    "Method": "Send",
+    "RelativePath": "api/admin/notifications/send",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "req",
+        "Type": "LittleHelperAI.Backend.Controllers.AdminNotificationsController\u002BSendRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "AdminPlansController",
+    "Method": "List",
+    "RelativePath": "api/admin/plans",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "AdminPlansController",
+    "Method": "DeletePlan",
+    "RelativePath": "api/admin/plans/{planId}",
+    "HttpMethod": "DELETE",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "planId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "AdminPlansController",
+    "Method": "UpsertPlan",
+    "RelativePath": "api/admin/plans/upsert-plan",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "plan",
+        "Type": "LittleHelperAI.Shared.Models.StripePlan",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "AdminPlansController",
+    "Method": "UpsertPolicy",
+    "RelativePath": "api/admin/plans/upsert-policy",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "policy",
+        "Type": "LittleHelperAI.Shared.Models.StripePlanPolicy",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminPurchaseRewardsController",
+    "Method": "GetCreditAuditLog",
+    "RelativePath": "api/admin/purchase-rewards/audit-log",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "page",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "pageSize",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminPurchaseRewardsController",
+    "Method": "ValidateAuditEntry",
+    "RelativePath": "api/admin/purchase-rewards/audit-log/validate/{auditId}",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "auditId",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminPurchaseRewardsController",
+    "Method": "GetPlansWithRewardSettings",
+    "RelativePath": "api/admin/purchase-rewards/plans",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminPurchaseRewardsController",
+    "Method": "UpdatePlanRewardSettings",
+    "RelativePath": "api/admin/purchase-rewards/plans/update",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "LittleHelperAI.Backend.Controllers.UpdatePlanRewardSettingsRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminPurchaseRewardsController",
+    "Method": "GetPurchaseRewardStats",
+    "RelativePath": "api/admin/purchase-rewards/stats",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminRewardsController",
+    "Method": "ManualAward",
+    "RelativePath": "api/admin/rewards/manual-award",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "LittleHelperAI.Backend.Controllers.AdminRewardsController\u002BManualAwardRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminRewardsController",
+    "Method": "GetSettings",
+    "RelativePath": "api/admin/rewards/settings",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminRewardsController",
+    "Method": "UpdateSettings",
+    "RelativePath": "api/admin/rewards/settings",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "LittleHelperAI.Shared.Models.UpdateReferralSettingsRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminRewardsController",
+    "Method": "GetStats",
+    "RelativePath": "api/admin/rewards/stats",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminRewardsController",
+    "Method": "GetTransactions",
+    "RelativePath": "api/admin/rewards/transactions",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminSettingsController",
+    "Method": "GetSettings",
+    "RelativePath": "api/admin/settings",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminSettingsController",
+    "Method": "SaveSettings",
+    "RelativePath": "api/admin/settings",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "LittleHelperAI.Backend.Controllers.AdminSettingsController\u002BSettingsRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminSnapshotsController",
+    "Method": "List",
+    "RelativePath": "api/admin/snapshots",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminSnapshotsController",
+    "Method": "Create",
+    "RelativePath": "api/admin/snapshots/create",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminSnapshotsController",
+    "Method": "Download",
+    "RelativePath": "api/admin/snapshots/download/{fileName}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "fileName",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminStatsController",
+    "Method": "Get",
+    "RelativePath": "api/admin/stats",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminSubscriptionsController",
+    "Method": "List",
+    "RelativePath": "api/admin/subscriptions",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "take",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "skip",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminSubscriptionsController",
+    "Method": "Assign",
+    "RelativePath": "api/admin/subscriptions/assign",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "req",
+        "Type": "LittleHelperAI.Backend.Controllers.AdminSubscriptionsController\u002BAssignSubscriptionRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminSubscriptionsController",
+    "Method": "Cancel",
+    "RelativePath": "api/admin/subscriptions/cancel",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "req",
+        "Type": "LittleHelperAI.Backend.Controllers.AdminSubscriptionsController\u002BCancelSubscriptionRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminSubscriptionsController",
+    "Method": "GetPlans",
+    "RelativePath": "api/admin/subscriptions/plans",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminSubscriptionsController",
+    "Method": "Update",
+    "RelativePath": "api/admin/subscriptions/update",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "req",
+        "Type": "LittleHelperAI.Backend.Controllers.AdminSubscriptionsController\u002BUpdateSubscriptionRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminSupportController",
+    "Method": "GetStats",
+    "RelativePath": "api/admin/support/stats",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminSupportController",
+    "Method": "GetTicketDetails",
+    "RelativePath": "api/admin/support/ticket/{ticketId}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "ticketId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminSupportController",
+    "Method": "AdminReply",
+    "RelativePath": "api/admin/support/ticket/{ticketId}/reply",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "ticketId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      },
+      {
+        "Name": "req",
+        "Type": "LittleHelperAI.Backend.Controllers.AdminSupportController\u002BAdminReplyRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminSupportController",
+    "Method": "UpdateTicket",
+    "RelativePath": "api/admin/support/ticket/{ticketId}/update",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "ticketId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      },
+      {
+        "Name": "req",
+        "Type": "LittleHelperAI.Backend.Controllers.AdminSupportController\u002BUpdateStatusRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminSupportController",
+    "Method": "GetAllTickets",
+    "RelativePath": "api/admin/support/tickets",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "status",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "priority",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "take",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "skip",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AdminUsersLookupController",
+    "Method": "Search",
+    "RelativePath": "api/admin/users/search",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "q",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "take",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AuthController",
+    "Method": "Login",
+    "RelativePath": "api/auth/login",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "LittleHelperAI.Shared.Models.LoginRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.AuthController",
+    "Method": "Register",
+    "RelativePath": "api/auth/register",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "RegisterRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.ChatController",
+    "Method": "DeleteChat",
+    "RelativePath": "api/chat/delete/{chatId}",
+    "HttpMethod": "DELETE",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "chatId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      },
+      {
+        "Name": "userId",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.ChatController",
+    "Method": "GetHistory",
+    "RelativePath": "api/chat/history/{userId}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "userId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.ChatController",
+    "Method": "LoadChatById",
+    "RelativePath": "api/chat/load/{chatId}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "chatId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[LittleHelperAI.Shared.Models.ChatMessageDto, LittleHelperAI.Shared, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.ChatController",
+    "Method": "Send",
+    "RelativePath": "api/chat/send",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "LittleHelperAI.Shared.Models.ChatRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.FeedbackController",
+    "Method": "Submit",
+    "RelativePath": "api/feedback",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "item",
+        "Type": "LittleHelperAI.Shared.Models.FeedbackItem",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.LlmController",
+    "Method": "GetInfo",
+    "RelativePath": "api/Llm/info",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.LlmController",
+    "Method": "LoadModel",
+    "RelativePath": "api/Llm/load",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "LittleHelperAI.Shared.Models.ModelSelectionRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.LlmController",
+    "Method": "GetProviders",
+    "RelativePath": "api/Llm/providers",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.LlmController",
+    "Method": "Reinitialize",
+    "RelativePath": "api/Llm/reinit",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.LlmController",
+    "Method": "ReloadModel",
+    "RelativePath": "api/Llm/reload",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.LlmController",
+    "Method": "GetStats",
+    "RelativePath": "api/Llm/stats",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.NotificationsController",
+    "Method": "ClearAll",
+    "RelativePath": "api/notifications/clear-all",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.NotificationsController",
+    "Method": "ClearRead",
+    "RelativePath": "api/notifications/clear-read",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.NotificationsController",
+    "Method": "List",
+    "RelativePath": "api/notifications/list",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "take",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.NotificationsController",
+    "Method": "MarkRead",
+    "RelativePath": "api/notifications/mark-read/{id}",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int64",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.NotificationsController",
+    "Method": "UnreadCount",
+    "RelativePath": "api/notifications/unread",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.NotificationsController",
+    "Method": "UnreadCount",
+    "RelativePath": "api/notifications/unread-count",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.PipelinesController",
+    "Method": "GetPipelines",
+    "RelativePath": "api/Pipelines",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "LittleHelperAI.Backend.Controllers.PipelinesResponse",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.PipelinesController",
+    "Method": "SavePipeline",
+    "RelativePath": "api/Pipelines",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "dto",
+        "Type": "LittleHelperAI.Backend.Controllers.PipelineDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "LittleHelperAI.Backend.Controllers.PipelineDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.PipelinesController",
+    "Method": "GetPipeline",
+    "RelativePath": "api/Pipelines/{id}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "LittleHelperAI.Backend.Controllers.PipelineDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.PipelinesController",
+    "Method": "UpdatePipeline",
+    "RelativePath": "api/Pipelines/{id}",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "dto",
+        "Type": "LittleHelperAI.Backend.Controllers.PipelineDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "LittleHelperAI.Backend.Controllers.PipelineDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.PipelinesController",
+    "Method": "DeletePipeline",
+    "RelativePath": "api/Pipelines/{id}",
+    "HttpMethod": "DELETE",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.PipelinesController",
+    "Method": "UpdateKeywords",
+    "RelativePath": "api/Pipelines/{id}/keywords",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "keywords",
+        "Type": "System.Collections.Generic.List\u00601[[System.String, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.PipelinesController",
+    "Method": "GetActivePipeline",
+    "RelativePath": "api/Pipelines/active",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "LittleHelperAI.Backend.Controllers.PipelineDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.PipelinesController",
+    "Method": "SetActivePipeline",
+    "RelativePath": "api/Pipelines/active/{id}",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.PipelinesController",
+    "Method": "MatchPipeline",
+    "RelativePath": "api/Pipelines/match",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "message",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "LittleHelperAI.Backend.Controllers.PipelineDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.PipelinesController",
+    "Method": "GetPrimaryPipeline",
+    "RelativePath": "api/Pipelines/primary",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "LittleHelperAI.Backend.Controllers.PipelineDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.PipelinesController",
+    "Method": "SetPrimaryPipeline",
+    "RelativePath": "api/Pipelines/primary/{id}",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.PipelinesController",
+    "Method": "GetStepRegistry",
+    "RelativePath": "api/Pipelines/registry/steps",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[LittleHelperAI.Backend.Controllers.StepRegistryItemDto, LittleHelperAI, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.PlansController",
+    "Method": "GetPlans",
+    "RelativePath": "api/Plans",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[LittleHelperAI.Shared.Models.StripePlan, LittleHelperAI.Shared, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.PlansController",
+    "Method": "ConfirmPayment",
+    "RelativePath": "api/Plans/confirm-payment",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "sessionId",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.PlansController",
+    "Method": "CreateCheckoutSession",
+    "RelativePath": "api/Plans/create-checkout-session",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "LittleHelperAI.Backend.Controllers.PlansController\u002BCreateCheckoutSessionRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.PlanStatusController",
+    "Method": "GetStatus",
+    "RelativePath": "api/plans/status/{userId}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "userId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.PlansController",
+    "Method": "GetUserPlans",
+    "RelativePath": "api/Plans/userplans",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[LittleHelperAI.Shared.Models.UserPlan, LittleHelperAI.Shared, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.ProjectFilesController",
+    "Method": "GetProjectFiles",
+    "RelativePath": "api/ProjectFiles",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "LittleHelperAI.Backend.Controllers.ProjectFilesResponse",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.ProjectFilesController",
+    "Method": "GetFileContent",
+    "RelativePath": "api/ProjectFiles/content",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "path",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "LittleHelperAI.Backend.Controllers.FileContentResponse",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.ProjectFilesController",
+    "Method": "GetProjectInfo",
+    "RelativePath": "api/ProjectFiles/info",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "LittleHelperAI.Backend.Controllers.ProjectInfoResponse",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.ReferralController",
+    "Method": "GetUserReferralInfo",
+    "RelativePath": "api/referral/info/{userId}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "userId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.ReferralController",
+    "Method": "RegenerateCode",
+    "RelativePath": "api/referral/regenerate/{userId}",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "userId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.ReferralController",
+    "Method": "ValidateReferralCode",
+    "RelativePath": "api/referral/validate/{code}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "code",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.StripeWebhookController",
+    "Method": "HandleStripeWebhook",
+    "RelativePath": "api/StripeWebhook",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.UserSubscriptionsController",
+    "Method": "GetActiveSubscription",
+    "RelativePath": "api/subscriptions/active",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.UserSubscriptionsController",
+    "Method": "CancelMySubscription",
+    "RelativePath": "api/subscriptions/cancel",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "req",
+        "Type": "LittleHelperAI.Backend.Controllers.UserSubscriptionsController\u002BCancelMySubscriptionRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.UserSubscriptionsController",
+    "Method": "GetMySubscriptions",
+    "RelativePath": "api/subscriptions/my",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.SupportController",
+    "Method": "CreateTicket",
+    "RelativePath": "api/support/create",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "req",
+        "Type": "LittleHelperAI.Backend.Controllers.SupportController\u002BCreateTicketRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.SupportController",
+    "Method": "GetMyTickets",
+    "RelativePath": "api/support/my-tickets",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.SupportController",
+    "Method": "GetTicketReplies",
+    "RelativePath": "api/support/ticket/{ticketId}/replies",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "ticketId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.SupportController",
+    "Method": "ReplyToTicket",
+    "RelativePath": "api/support/ticket/{ticketId}/reply",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "ticketId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      },
+      {
+        "Name": "req",
+        "Type": "LittleHelperAI.Backend.Controllers.SupportController\u002BReplyRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.UsersController",
+    "Method": "GetAll",
+    "RelativePath": "api/users",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.UsersController",
+    "Method": "Delete",
+    "RelativePath": "api/users/{id}",
+    "HttpMethod": "DELETE",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.UsersController",
+    "Method": "GetLiveCredits",
+    "RelativePath": "api/users/{id}/credits",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.CreditController",
+    "Method": "AddCredits",
+    "RelativePath": "api/users/add-credits",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "userId",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "amount",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.CreditController",
+    "Method": "GetAllUsers",
+    "RelativePath": "api/users/all",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.CreditController",
+    "Method": "ConfirmPayment",
+    "RelativePath": "api/users/confirm-payment",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "sessionId",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "userId",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.CreditController",
+    "Method": "CreateCheckoutSession",
+    "RelativePath": "api/users/create-checkout-session",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "LittleHelperAI.Backend.Controllers.CreditController\u002BPaymentRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.UsersController",
+    "Method": "Demote",
+    "RelativePath": "api/users/demote/{id}",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.UsersController",
+    "Method": "Me",
+    "RelativePath": "api/users/me",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.CreditController",
+    "Method": "GetPlans",
+    "RelativePath": "api/users/plans",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.UsersController",
+    "Method": "Promote",
+    "RelativePath": "api/users/promote/{id}",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.CreditController",
+    "Method": "RemoveCredits",
+    "RelativePath": "api/users/remove-credits",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "userId",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "amount",
+        "Type": "System.Double",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "LittleHelperAI.Backend.Controllers.UsersController",
+    "Method": "UpdateCredits",
+    "RelativePath": "api/users/update-credits",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "model",
+        "Type": "LittleHelperAI.Backend.Controllers.UsersController\u002BCreditUpdateModel",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  }
+]

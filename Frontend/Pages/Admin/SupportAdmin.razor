@@ -1,0 +1,423 @@
+@using System.Net.Http.Json
+@using LittleHelperAI.Shared.Models
+@inject HttpClient Http
+
+<div class="admin-grid">
+    <div class="admin-card admin-card-wide">
+        <div class="admin-card-title">Support Tickets</div>
+        <div class="admin-card-sub">Manage and respond to user complaints and support requests.</div>
+
+        <!-- Filters -->
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-top:12px;">
+            <div class="admin-form-field" style="min-width:150px;">
+                <label>Status</label>
+                <select @bind="_statusFilter">
+                    <option value="">All</option>
+                    <option value="open">Open</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="closed">Closed</option>
+                </select>
+            </div>
+            <div class="admin-form-field" style="min-width:150px;">
+                <label>Priority</label>
+                <select @bind="_priorityFilter">
+                    <option value="">All</option>
+                    <option value="urgent">Urgent</option>
+                    <option value="high">High</option>
+                    <option value="normal">Normal</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <button class="admin-btn admin-btn-primary" @onclick="Load" disabled="@_loading">↻ Refresh</button>
+        </div>
+
+        @if (_loading)
+        {
+            <div class="admin-muted" style="margin-top:12px;">Loading…</div>
+        }
+        else if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="admin-error" style="margin-top:12px;">@_error</div>
+        }
+        else if (_tickets.Count == 0)
+        {
+            <div class="admin-muted" style="margin-top:12px;">No tickets found.</div>
+        }
+        else
+        {
+            <div class="admin-table-wrap" style="margin-top:12px; max-height:500px;">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th style="width:60px;">Id</th>
+                            <th>User</th>
+                            <th>Subject</th>
+                            <th style="width:100px;">Status</th>
+                            <th style="width:80px;">Priority</th>
+                            <th style="width:90px;">Replies</th>
+                            <th style="width:140px;">Created</th>
+                            <th style="width:100px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in _tickets)
+                        {
+                            <tr style="cursor:pointer;" @onclick="() => SelectTicket(t)">
+                                <td>@t.Id</td>
+                                <td>
+                                    <div><strong>@t.UserName</strong></div>
+                                    <div style="font-size:11px; color:var(--text-secondary);">@t.UserEmail</div>
+                                </td>
+                                <td>@t.Subject</td>
+                                <td>
+                                    <span class="pill @StatusPillClass(t.Status)">@StatusIcon(t.Status) @t.Status</span>
+                                </td>
+                                <td>
+                                    <span class="@PriorityClass(t.Priority)">@PriorityIcon(t.Priority)</span>
+                                </td>
+                                <td>@t.ReplyCount</td>
+                                <td style="font-size:11px;">@t.CreatedAt.ToString("MMM dd, HH:mm")</td>
+                                <td>
+                                    <button class="admin-btn admin-btn-xs admin-btn-primary" @onclick="() => SelectTicket(t)" @onclick:stopPropagation>View</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="admin-muted" style="margin-top:10px;">Showing @_tickets.Count of @_total tickets</div>
+        }
+    </div>
+
+    <!-- Stats Card -->
+    <div class="admin-card">
+        <div class="admin-card-title">📈 Ticket Stats</div>
+        <div class="admin-card-sub">Quick overview of support queue.</div>
+
+        @if (_stats is not null)
+        {
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px;">
+                <div class="stat">
+                    <div class="stat-label">Total</div>
+                    <div class="stat-value">@_stats.Total</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Open</div>
+                    <div class="stat-value" style="color:#10b981;">@_stats.Open</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">In Progress</div>
+                    <div class="stat-value" style="color:#3b82f6;">@_stats.InProgress</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Urgent</div>
+                    <div class="stat-value" style="color:#ef4444;">@_stats.Urgent</div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Ticket Detail Modal -->
+@if (_selectedTicket is not null)
+{
+    <div class="admin-modal-backdrop" @onclick="CloseTicket">
+        <div class="admin-modal" style="max-width:800px;" @onclick:stopPropagation>
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                    <div class="admin-modal-title">🎫 Ticket #@_selectedTicket.Id</div>
+                    <div class="admin-modal-sub">@_selectedTicket.Subject</div>
+                </div>
+                <button class="admin-btn" @onclick="CloseTicket">✕</button>
+            </div>
+
+            <div style="margin-top:12px; padding:12px; background:var(--bg-tertiary); border-radius:12px;">
+                <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                    <div>
+                        <div style="font-size:11px; color:var(--text-secondary);">User</div>
+                        <div style="font-weight:700;">@_selectedTicket.UserName</div>
+                        <div style="font-size:12px; color:var(--text-secondary);">@_selectedTicket.UserEmail</div>
+                    </div>
+                    <div>
+                        <div style="font-size:11px; color:var(--text-secondary);">Status</div>
+                        <select @bind="_editStatus" style="padding:6px 10px; border-radius:8px; border:1px solid var(--border-default); background:var(--input-bg); color:var(--text-primary);">
+                            <option value="open">Open</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="closed">Closed</option>
+                        </select>
+                    </div>
+                    <div>
+                        <div style="font-size:11px; color:var(--text-secondary);">Priority</div>
+                        <select @bind="_editPriority" style="padding:6px 10px; border-radius:8px; border:1px solid var(--border-default); background:var(--input-bg); color:var(--text-primary);">
+                            <option value="low">Low</option>
+                            <option value="normal">Normal</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                        </select>
+                    </div>
+                    <button class="admin-btn admin-btn-primary" @onclick="UpdateTicketStatus" disabled="@_updating">@(_updating ? "Updating..." : "Update Status")</button>
+                </div>
+            </div>
+
+            <!-- Original Message -->
+            <div style="margin-top:16px;">
+                <div style="font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:6px;">Original Message</div>
+                <div style="padding:12px; background:var(--bg-secondary); border-radius:10px; border:1px solid var(--border-default); white-space:pre-wrap;">@_selectedTicket.Message</div>
+            </div>
+
+            <!-- Replies -->
+            <div style="margin-top:16px;">
+                <div style="font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:8px;">Conversation (@_replies.Count replies)</div>
+                <div style="max-height:250px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;">
+                    @foreach (var reply in _replies)
+                    {
+                        <div style="padding:10px 12px; border-radius:10px; background:@(reply.IsAdminReply ? "linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1))" : "var(--bg-tertiary)"); border:1px solid @(reply.IsAdminReply ? "rgba(59, 130, 246, 0.2)" : "var(--border-default)");">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                <span style="font-weight:700; font-size:12px;">@(reply.IsAdminReply ? "👑 " : "👤 ")@reply.SenderName</span>
+                                <span style="font-size:11px; color:var(--text-secondary);">@reply.CreatedAt.ToString("MMM dd, HH:mm")</span>
+                            </div>
+                            <div style="white-space:pre-wrap; font-size:13px;">@reply.Message</div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Reply Form -->
+            <div style="margin-top:16px;">
+                <div style="font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:6px;">Admin Reply</div>
+                <textarea @bind="_replyMessage" rows="3" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border-default); background:var(--input-bg); color:var(--text-primary); resize:vertical;" placeholder="Type your response..."></textarea>
+                <div style="margin-top:10px; display:flex; gap:10px; align-items:center;">
+                    <button class="admin-btn admin-btn-primary" @onclick="SendReply" disabled="@_sendingReply">
+                        @(_sendingReply ? "Sending..." : "📤 Send Reply")
+                    </button>
+                    <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary);">
+                        <input type="checkbox" @bind="_notifyUser" /> Notify user
+                    </label>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_modalStatus))
+            {
+                <div class="admin-muted" style="margin-top:10px;">@_modalStatus</div>
+            }
+        </div>
+    </div>
+}
+
+<style>
+    .pill-open { background: rgba(16, 185, 129, 0.15) !important; color: #10b981 !important; border-color: rgba(16, 185, 129, 0.3) !important; }
+    .pill-progress { background: rgba(59, 130, 246, 0.15) !important; color: #3b82f6 !important; border-color: rgba(59, 130, 246, 0.3) !important; }
+    .pill-resolved { background: rgba(139, 92, 246, 0.15) !important; color: #8b5cf6 !important; border-color: rgba(139, 92, 246, 0.3) !important; }
+    .pill-closed { background: rgba(107, 114, 128, 0.15) !important; color: #6b7280 !important; border-color: rgba(107, 114, 128, 0.3) !important; }
+</style>
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+    private string _statusFilter = "";
+    private string _priorityFilter = "";
+    private int _total = 0;
+    private List<SupportTicketDto> _tickets = new();
+    private SupportStats? _stats;
+
+    // Detail modal
+    private SupportTicketDto? _selectedTicket;
+    private List<SupportTicketReplyDto> _replies = new();
+    private string _editStatus = "open";
+    private string _editPriority = "normal";
+    private string _replyMessage = "";
+    private bool _notifyUser = true;
+    private bool _sendingReply;
+    private bool _updating;
+    private string? _modalStatus;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+        await LoadStats();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var url = $"api/admin/support/tickets?take=100";
+            if (!string.IsNullOrWhiteSpace(_statusFilter)) url += $"&status={_statusFilter}";
+            if (!string.IsNullOrWhiteSpace(_priorityFilter)) url += $"&priority={_priorityFilter}";
+
+            var resp = await Http.GetFromJsonAsync<TicketsResponse>(url);
+            _tickets = resp?.Items ?? new();
+            _total = resp?.Total ?? 0;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadStats()
+    {
+        try
+        {
+            _stats = await Http.GetFromJsonAsync<SupportStats>("api/admin/support/stats");
+        }
+        catch { }
+    }
+
+    private async Task SelectTicket(SupportTicketDto ticket)
+    {
+        _selectedTicket = ticket;
+        _editStatus = ticket.Status;
+        _editPriority = ticket.Priority;
+        _replyMessage = "";
+        _modalStatus = null;
+        _replies = new();
+
+        try
+        {
+            var resp = await Http.GetFromJsonAsync<TicketDetailResponse>($"api/admin/support/ticket/{ticket.Id}");
+            if (resp is not null)
+            {
+                _replies = resp.Replies ?? new();
+            }
+        }
+        catch { }
+    }
+
+    private void CloseTicket()
+    {
+        _selectedTicket = null;
+        _replies = new();
+    }
+
+    private async Task UpdateTicketStatus()
+    {
+        if (_selectedTicket is null) return;
+        _updating = true;
+        _modalStatus = null;
+
+        try
+        {
+            var resp = await Http.PostAsJsonAsync($"api/admin/support/ticket/{_selectedTicket.Id}/update", new { status = _editStatus, priority = _editPriority });
+            if (resp.IsSuccessStatusCode)
+            {
+                _modalStatus = "✅ Status updated";
+                _selectedTicket.Status = _editStatus;
+                _selectedTicket.Priority = _editPriority;
+                await Load();
+                await LoadStats();
+            }
+            else
+            {
+                _modalStatus = "❌ " + await resp.Content.ReadAsStringAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _modalStatus = "❌ " + ex.Message;
+        }
+        finally
+        {
+            _updating = false;
+        }
+    }
+
+    private async Task SendReply()
+    {
+        if (_selectedTicket is null || string.IsNullOrWhiteSpace(_replyMessage)) return;
+        _sendingReply = true;
+        _modalStatus = null;
+
+        try
+        {
+            var resp = await Http.PostAsJsonAsync($"api/admin/support/ticket/{_selectedTicket.Id}/reply", new { message = _replyMessage, sendNotification = _notifyUser });
+            if (resp.IsSuccessStatusCode)
+            {
+                _modalStatus = "✅ Reply sent";
+                _replyMessage = "";
+                // Reload replies
+                await SelectTicket(_selectedTicket);
+                await Load();
+            }
+            else
+            {
+                _modalStatus = "❌ " + await resp.Content.ReadAsStringAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _modalStatus = "❌ " + ex.Message;
+        }
+        finally
+        {
+            _sendingReply = false;
+        }
+    }
+
+    private static string StatusIcon(string status) => status switch
+    {
+        "open" => "🟢",
+        "in_progress" => "🔵",
+        "resolved" => "🟣",
+        "closed" => "⚪",
+        _ => "⚪"
+    };
+
+    private static string StatusPillClass(string status) => status switch
+    {
+        "open" => "pill-open",
+        "in_progress" => "pill-progress",
+        "resolved" => "pill-resolved",
+        "closed" => "pill-closed",
+        _ => ""
+    };
+
+    private static string PriorityIcon(string priority) => priority switch
+    {
+        "urgent" => "🔴 Urgent",
+        "high" => "🟠 High",
+        "normal" => "🟢 Normal",
+        "low" => "⚪ Low",
+        _ => "⚪"
+    };
+
+    private static string PriorityClass(string priority) => priority switch
+    {
+        "urgent" => "color:#ef4444; font-weight:700;",
+        "high" => "color:#f97316; font-weight:700;",
+        "normal" => "color:var(--text-secondary);",
+        "low" => "color:var(--text-tertiary);",
+        _ => ""
+    };
+
+    private class TicketsResponse
+    {
+        public int Total { get; set; }
+        public List<SupportTicketDto> Items { get; set; } = new();
+    }
+
+    private class TicketDetailResponse
+    {
+        public SupportTicketDto? Ticket { get; set; }
+        public List<SupportTicketReplyDto> Replies { get; set; } = new();
+    }
+
+    private class SupportStats
+    {
+        public long Total { get; set; }
+        public long Open { get; set; }
+        public long InProgress { get; set; }
+        public long Resolved { get; set; }
+        public long Closed { get; set; }
+        public long Urgent { get; set; }
+        public long High { get; set; }
+    }
+}

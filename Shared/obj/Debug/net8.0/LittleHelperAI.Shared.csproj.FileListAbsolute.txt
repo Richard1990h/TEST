@@ -1,0 +1,89 @@
+/app/Shared/bin/Debug/net8.0/LittleHelperAI.Shared.deps.json
+/app/Shared/bin/Debug/net8.0/LittleHelperAI.Shared.dll
+/app/Shared/bin/Debug/net8.0/LittleHelperAI.Shared.pdb
+/app/Shared/obj/Debug/net8.0/LittleHelperAI.Shared.GeneratedMSBuildEditorConfig.editorconfig
+/app/Shared/obj/Debug/net8.0/LittleHelperAI.Shared.AssemblyInfoInputs.cache
+/app/Shared/obj/Debug/net8.0/LittleHelperAI.Shared.AssemblyInfo.cs
+/app/Shared/obj/Debug/net8.0/LittleHelperAI.Shared.csproj.CoreCompileInputs.cache
+/app/Shared/obj/Debug/net8.0/LittleHelperAI.Shared.dll
+/app/Shared/obj/Debug/net8.0/refint/LittleHelperAI.Shared.dll
+/app/Shared/obj/Debug/net8.0/LittleHelperAI.Shared.pdb
+/app/Shared/obj/Debug/net8.0/ref/LittleHelperAI.Shared.dll
+/app/Shared/obj/Debug/net8.0/LittleHelperAI.Shared.sourcelink.json
+C:\Users\Richard\Downloads\LH.V333-main\LH.V3-main\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.deps.json
+C:\Users\Richard\Downloads\LH.V333-main\LH.V3-main\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LH.V333-main\LH.V3-main\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.pdb
+C:\Users\Richard\Downloads\LH.V333-main\LH.V3-main\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Richard\Downloads\LH.V333-main\LH.V3-main\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.AssemblyInfoInputs.cache
+C:\Users\Richard\Downloads\LH.V333-main\LH.V3-main\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.AssemblyInfo.cs
+C:\Users\Richard\Downloads\LH.V333-main\LH.V3-main\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.csproj.CoreCompileInputs.cache
+C:\Users\Richard\Downloads\LH.V333-main\LH.V3-main\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LH.V333-main\LH.V3-main\Shared\obj\Debug\net8.0\refint\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LH.V333-main\LH.V3-main\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.pdb
+C:\Users\Richard\Downloads\LH.V333-main\LH.V3-main\Shared\obj\Debug\net8.0\ref\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LH.V4-main\LH.V4-main\LH.V333-main\LH.V3-main\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.deps.json
+C:\Users\Richard\Downloads\LH.V4-main\LH.V4-main\LH.V333-main\LH.V3-main\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LH.V4-main\LH.V4-main\LH.V333-main\LH.V3-main\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.pdb
+C:\Users\Richard\Downloads\LH.V4-main\LH.V4-main\LH.V333-main\LH.V3-main\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Richard\Downloads\LH.V4-main\LH.V4-main\LH.V333-main\LH.V3-main\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.AssemblyInfoInputs.cache
+C:\Users\Richard\Downloads\LH.V4-main\LH.V4-main\LH.V333-main\LH.V3-main\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.AssemblyInfo.cs
+C:\Users\Richard\Downloads\LH.V4-main\LH.V4-main\LH.V333-main\LH.V3-main\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.csproj.CoreCompileInputs.cache
+C:\Users\Richard\Downloads\LH.V4-main\LH.V4-main\LH.V333-main\LH.V3-main\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LH.V4-main\LH.V4-main\LH.V333-main\LH.V3-main\Shared\obj\Debug\net8.0\refint\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LH.V4-main\LH.V4-main\LH.V333-main\LH.V3-main\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.pdb
+C:\Users\Richard\Downloads\LH.V4-main\LH.V4-main\LH.V333-main\LH.V3-main\Shared\obj\Debug\net8.0\ref\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LittleHelperAIFactory prgressandCI,CDAdvance\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.deps.json
+C:\Users\Richard\Downloads\LittleHelperAIFactory prgressandCI,CDAdvance\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LittleHelperAIFactory prgressandCI,CDAdvance\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.pdb
+C:\Users\Richard\Downloads\LittleHelperAIFactory prgressandCI,CDAdvance\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Richard\Downloads\LittleHelperAIFactory prgressandCI,CDAdvance\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.AssemblyInfoInputs.cache
+C:\Users\Richard\Downloads\LittleHelperAIFactory prgressandCI,CDAdvance\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.AssemblyInfo.cs
+C:\Users\Richard\Downloads\LittleHelperAIFactory prgressandCI,CDAdvance\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.csproj.CoreCompileInputs.cache
+C:\Users\Richard\Downloads\LittleHelperAIFactory prgressandCI,CDAdvance\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LittleHelperAIFactory prgressandCI,CDAdvance\Shared\obj\Debug\net8.0\refint\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LittleHelperAIFactory prgressandCI,CDAdvance\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.pdb
+C:\Users\Richard\Downloads\LittleHelperAIFactory prgressandCI,CDAdvance\Shared\obj\Debug\net8.0\ref\LittleHelperAI.Shared.dll
+F:\HELEPRAIV2\LittleHelperAI\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.deps.json
+F:\HELEPRAIV2\LittleHelperAI\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.dll
+F:\HELEPRAIV2\LittleHelperAI\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.pdb
+F:\HELEPRAIV2\LittleHelperAI\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.GeneratedMSBuildEditorConfig.editorconfig
+F:\HELEPRAIV2\LittleHelperAI\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.AssemblyInfoInputs.cache
+F:\HELEPRAIV2\LittleHelperAI\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.AssemblyInfo.cs
+F:\HELEPRAIV2\LittleHelperAI\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.csproj.CoreCompileInputs.cache
+F:\HELEPRAIV2\LittleHelperAI\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.dll
+F:\HELEPRAIV2\LittleHelperAI\Shared\obj\Debug\net8.0\refint\LittleHelperAI.Shared.dll
+F:\HELEPRAIV2\LittleHelperAI\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.pdb
+F:\HELEPRAIV2\LittleHelperAI\Shared\obj\Debug\net8.0\ref\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LittleHelperAIgptthinking done\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.deps.json
+C:\Users\Richard\Downloads\LittleHelperAIgptthinking done\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LittleHelperAIgptthinking done\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.pdb
+C:\Users\Richard\Downloads\LittleHelperAIgptthinking done\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Richard\Downloads\LittleHelperAIgptthinking done\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.AssemblyInfoInputs.cache
+C:\Users\Richard\Downloads\LittleHelperAIgptthinking done\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.AssemblyInfo.cs
+C:\Users\Richard\Downloads\LittleHelperAIgptthinking done\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.csproj.CoreCompileInputs.cache
+C:\Users\Richard\Downloads\LittleHelperAIgptthinking done\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LittleHelperAIgptthinking done\Shared\obj\Debug\net8.0\refint\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LittleHelperAIgptthinking done\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.pdb
+C:\Users\Richard\Downloads\LittleHelperAIgptthinking done\Shared\obj\Debug\net8.0\ref\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LittleHelperAI\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.deps.json
+C:\Users\Richard\Downloads\LittleHelperAI\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LittleHelperAI\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.pdb
+C:\Users\Richard\Downloads\LittleHelperAI\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Richard\Downloads\LittleHelperAI\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.AssemblyInfoInputs.cache
+C:\Users\Richard\Downloads\LittleHelperAI\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.AssemblyInfo.cs
+C:\Users\Richard\Downloads\LittleHelperAI\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.csproj.CoreCompileInputs.cache
+C:\Users\Richard\Downloads\LittleHelperAI\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LittleHelperAI\Shared\obj\Debug\net8.0\refint\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\LittleHelperAI\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.pdb
+C:\Users\Richard\Downloads\LittleHelperAI\Shared\obj\Debug\net8.0\ref\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\KING0.0.0.2\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.deps.json
+C:\Users\Richard\Downloads\KING0.0.0.2\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\KING0.0.0.2\Shared\bin\Debug\net8.0\LittleHelperAI.Shared.pdb
+C:\Users\Richard\Downloads\KING0.0.0.2\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Richard\Downloads\KING0.0.0.2\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.AssemblyInfoInputs.cache
+C:\Users\Richard\Downloads\KING0.0.0.2\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.AssemblyInfo.cs
+C:\Users\Richard\Downloads\KING0.0.0.2\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.csproj.CoreCompileInputs.cache
+C:\Users\Richard\Downloads\KING0.0.0.2\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\KING0.0.0.2\Shared\obj\Debug\net8.0\refint\LittleHelperAI.Shared.dll
+C:\Users\Richard\Downloads\KING0.0.0.2\Shared\obj\Debug\net8.0\LittleHelperAI.Shared.pdb
+C:\Users\Richard\Downloads\KING0.0.0.2\Shared\obj\Debug\net8.0\ref\LittleHelperAI.Shared.dll

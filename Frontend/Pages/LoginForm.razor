@@ -1,0 +1,450 @@
+@inject AuthService AuthService
+@inject UserSessionService Session
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<style>
+    /* ============================================
+       CYBERPUNK LOGIN FORM STYLES - Theme Support
+       ============================================ */
+    
+    .cyber-auth-wrapper {
+        min-height: 100vh;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-canvas);
+        padding: 1.5rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* Background effects - Dark mode only */
+    [data-theme="dark"] .cyber-auth-wrapper::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: 
+            radial-gradient(ellipse at 20% 20%, rgba(0, 255, 136, 0.05) 0%, transparent 50%),
+            radial-gradient(ellipse at 80% 80%, rgba(0, 240, 255, 0.05) 0%, transparent 50%);
+        pointer-events: none;
+    }
+
+    /* Grid overlay - Dark mode only */
+    [data-theme="dark"] .cyber-auth-wrapper::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: 
+            linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+        background-size: 40px 40px;
+        pointer-events: none;
+    }
+
+    .cyber-login-container {
+        background: var(--bg-glass);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        border: 1px solid var(--border-color);
+        padding: 2.5rem;
+        width: 100%;
+        max-width: 420px;
+        position: relative;
+        animation: containerFadeIn 0.5s ease-out;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .cyber-login-container:hover {
+        border-color: var(--border-glow);
+    }
+
+    [data-theme="dark"] .cyber-login-container:hover {
+        box-shadow: 0 0 40px rgba(0, 255, 136, 0.1);
+    }
+
+    /* Top gradient border */
+    .cyber-login-container::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--gradient-button);
+        background-size: 200% 100%;
+        animation: gradientFlow 3s linear infinite;
+        border-radius: 16px 16px 0 0;
+    }
+
+    @@keyframes containerFadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @@keyframes gradientFlow {
+        0% { background-position: 0% 50%; }
+        100% { background-position: 200% 50%; }
+    }
+
+    /* Theme toggle positioned in top-right corner */
+    .auth-theme-toggle {
+        position: fixed;
+        top: 1.5rem;
+        right: 1.5rem;
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        transition: all 0.2s ease;
+        z-index: 9999;
+    }
+
+    .auth-theme-toggle:hover {
+        border-color: var(--cyber-green);
+        background: var(--bg-hover);
+    }
+
+    [data-theme="dark"] .auth-theme-toggle:hover {
+        box-shadow: 0 0 15px var(--cyber-green-glow);
+    }
+
+    .cyber-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .cyber-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+        letter-spacing: -0.02em;
+    }
+
+    .cyber-title-accent {
+        background: var(--gradient-primary);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .cyber-subtitle {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+    }
+
+    .cyber-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: var(--cyber-green-glow);
+        border: 1px solid var(--cyber-green-dim);
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-family: var(--font-mono);
+        color: var(--cyber-green);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-top: 1rem;
+    }
+
+    .cyber-status-dot {
+        width: 6px;
+        height: 6px;
+        background: var(--cyber-green);
+        border-radius: 50%;
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .cyber-error {
+        background: rgba(255, 51, 51, 0.1);
+        border: 1px solid rgba(255, 51, 51, 0.3);
+        color: var(--cyber-red);
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        margin-bottom: 1.5rem;
+        font-family: var(--font-mono);
+    }
+
+    .cyber-form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .cyber-label {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        color: var(--cyber-green);
+        margin-bottom: 0.5rem;
+    }
+
+    .cyber-input-wrapper {
+        position: relative;
+    }
+
+    .cyber-input {
+        width: 100%;
+        background: var(--input-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.875rem 1rem;
+        font-family: var(--font-sans);
+        font-size: 0.95rem;
+        color: var(--text-primary);
+        transition: all 0.2s ease;
+    }
+
+    .cyber-input::placeholder {
+        color: var(--text-muted);
+    }
+
+    .cyber-input:focus {
+        outline: none;
+        border-color: var(--cyber-green);
+        box-shadow: 0 0 0 3px var(--cyber-green-glow);
+    }
+
+    [data-theme="dark"] .cyber-input:focus {
+        box-shadow: 0 0 0 3px var(--cyber-green-glow), 0 0 20px rgba(0, 255, 136, 0.1);
+    }
+
+    .cyber-input-icon {
+        position: absolute;
+        right: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 1rem;
+        transition: color 0.2s ease;
+    }
+
+    .cyber-input-icon:hover {
+        color: var(--cyber-green);
+    }
+
+    .cyber-btn {
+        width: 100%;
+        background: var(--gradient-button);
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 0.95rem;
+        padding: 0.875rem 1.5rem;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-top: 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    [data-theme="dark"] .cyber-btn {
+        color: #0a0a0f;
+    }
+
+    .cyber-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px var(--cyber-green-glow);
+    }
+
+    .cyber-btn:active:not(:disabled) {
+        transform: translateY(0);
+    }
+
+    .cyber-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .cyber-footer {
+        text-align: center;
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .cyber-footer-text {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+    }
+
+    .cyber-footer-link {
+        color: var(--cyber-cyan);
+        text-decoration: none;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .cyber-footer-link:hover {
+        color: var(--cyber-green);
+    }
+
+    [data-theme="dark"] .cyber-footer-link:hover {
+        text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+    }
+
+    /* Responsive */
+    @@media (max-width: 480px) {
+        .cyber-login-container {
+            padding: 1.75rem;
+            border-radius: 12px;
+        }
+        
+        .cyber-title {
+            font-size: 1.25rem;
+        }
+    }
+</style>
+
+<div class="cyber-auth-wrapper">
+    <div class="cyber-login-container">
+        <div class="cyber-header">
+            <h2 class="cyber-title">
+                <span class="cyber-title-accent">THE AI HAS TAKEN CONTROL</span>
+            </h2>
+            <p class="cyber-subtitle">Access your neural interface</p>
+            <div class="cyber-status">
+                <span class="cyber-status-dot"></span>
+                SYSTEM ONLINE
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div class="cyber-error">
+                ⚠ @ErrorMessage
+            </div>
+        }
+
+        <div class="cyber-form-group">
+            <label class="cyber-label" for="identifier">DISPLAY_NAME</label>
+            <div class="cyber-input-wrapper">
+                <input 
+                    id="identifier" 
+                    class="cyber-input" 
+                    placeholder="Enter your username or email" 
+                    @bind="LoginModel.Identifier"
+                    @onkeyup="@(e => HandleKeyPress(e))"
+                    disabled="@IsLoading" />
+            </div>
+        </div>
+
+        <div class="cyber-form-group">
+            <label class="cyber-label" for="loginPassword">SECURITY_KEY</label>
+            <div class="cyber-input-wrapper">
+                <input 
+                    id="loginPassword" 
+                    class="cyber-input" 
+                    placeholder="Enter your password" 
+                    type="@PasswordInputType" 
+                    @bind="LoginModel.Password"
+                    @onkeyup="@(e => HandleKeyPress(e))"
+                    disabled="@IsLoading" />
+                <span class="cyber-input-icon" @onclick="TogglePassword" title="Toggle password visibility">
+                    @(ShowPassword ? "👁" : "🔒")
+                </span>
+            </div>
+        </div>
+
+        <button class="cyber-btn" @onclick="HandleLogin" disabled="@IsLoading">
+            @(IsLoading ? "⏳ CONNECTING..." : "[ INITIALIZE CONNECTION ]")
+        </button>
+
+        <div class="cyber-footer">
+            <p class="cyber-footer-text">
+                New operative? 
+                <a class="cyber-footer-link" @onclick="@(() => Navigation.NavigateTo("/register"))">Request Access</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LoginRequest LoginModel = new();
+    private string? ErrorMessage;
+    private bool ShowPassword = false;
+    private bool IsLoading = false;
+
+    private string PasswordInputType => ShowPassword ? "text" : "password";
+
+    [Parameter] public EventCallback OnLoginSuccess { get; set; }
+
+    private void TogglePassword() => ShowPassword = !ShowPassword;
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !IsLoading)
+        {
+            await HandleLogin();
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        ErrorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(LoginModel.Identifier) || string.IsNullOrWhiteSpace(LoginModel.Password))
+        {
+            ErrorMessage = "Please enter both username/email and password.";
+            return;
+        }
+
+        try
+        {
+            IsLoading = true;
+
+            var result = await AuthService.Login(LoginModel);
+
+            if (result?.User != null)
+            {
+                await Session.SetUserAsync(result.User);
+                await OnLoginSuccess.InvokeAsync();
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                ErrorMessage = "Invalid login credentials.";
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            var backendMessage = ex.Message;
+            if (backendMessage.Contains("Account does not exist", StringComparison.OrdinalIgnoreCase))
+                ErrorMessage = "Account does not exist. Please register first.";
+            else if (backendMessage.Contains("Incorrect password", StringComparison.OrdinalIgnoreCase))
+                ErrorMessage = "Incorrect password. Please try again.";
+            else
+                ErrorMessage = "Server error during login. Please try again later.";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+}

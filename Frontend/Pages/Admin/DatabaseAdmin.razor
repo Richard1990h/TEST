@@ -1,0 +1,354 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<div class="admin-grid">
+    <div class="admin-card admin-card-wide">
+        <div class="admin-card-title">Database Manager</div>
+        <div class="admin-card-sub">Allowed tables only. View / search / add / edit / delete. Changes are logged to admin audit.</div>
+
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-top:12px;">
+            <div class="admin-form-field" style="min-width:260px;">
+                <label>Table</label>
+                <select @bind="_table" @bind:after="OnTableChanged">
+                    @foreach (var t in _tables)
+                    {
+                        <option value="@t">@t</option>
+                    }
+                </select>
+            </div>
+
+            <div class="admin-form-field" style="min-width:260px;">
+                <label>Search</label>
+                <input @bind="_q" @bind:event="oninput" placeholder="search text columns…" />
+            </div>
+
+            <button class="admin-btn admin-btn-primary" @onclick="Reload" disabled="@_loading">↻ Refresh</button>
+            <button class="admin-btn" @onclick="OpenInsert" disabled="@_loading">Add Row</button>
+        </div>
+
+        @if (_loading)
+        {
+            <div class="admin-muted" style="margin-top:12px;">Loading…</div>
+        }
+        else if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="admin-error" style="margin-top:12px;">@_error</div>
+        }
+        else if (_data is not null)
+        {
+            <div style="display:flex; gap:10px; align-items:center; margin-top:10px; flex-wrap:wrap;">
+                <span class="pill">Total: @_data.total</span>
+                <span class="pill">Showing: @_data.rows.Count</span>
+                <span class="pill">PK: @_data.primaryKey</span>
+            </div>
+
+            <div class="admin-table-wrap" style="margin-top:10px;">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            @foreach (var c in _data.columns)
+                            {
+                                <th>@c.name</th>
+                            }
+                            <th style="min-width:160px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in _data.rows)
+                        {
+                            <tr>
+                                @foreach (var c in _data.columns)
+                                {
+                                    <td>@Cell(row, c.name)</td>
+                                }
+                                <td>
+                                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                        <button class="admin-btn admin-btn-xs admin-btn-primary" @onclick="(() => OpenEdit(row))" title="Edit row">Edit</button>
+                                        <button class="admin-btn admin-btn-xs admin-btn-danger" @onclick="(() => Delete(row))" title="Delete row">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap;">
+                <button class="admin-btn" @onclick="Prev" disabled="@(_skip == 0 || _loading)">← Prev</button>
+                <button class="admin-btn" @onclick="Next" disabled="@((_skip + _take) >= _data.total || _loading)">Next →</button>
+                <span class="admin-muted">Page @((_skip / _take) + 1) of @Math.Ceiling((double)_data.total / _take)</span>
+            </div>
+        }
+    </div>
+
+    <div class="admin-card">
+        <div class="admin-card-title">Security Notes</div>
+        <div class="admin-card-sub">This tool is restricted by allowlist.</div>
+        <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; gap:8px; padding:10px; background:var(--bg-tertiary); border-radius:10px;">
+                <span style="color:var(--text-secondary);">Table names are allowlisted server-side.</span>
+            </div>
+            <div style="display:flex; gap:8px; padding:10px; background:var(--bg-tertiary); border-radius:10px;">
+                <span style="color:var(--text-secondary);">Search only runs across text columns.</span>
+            </div>
+            <div style="display:flex; gap:8px; padding:10px; background:var(--bg-tertiary); border-radius:10px;">
+                <span style="color:var(--text-secondary);">Updates require a primary key.</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_modalOpen)
+{
+    <div class="admin-modal-backdrop" @onclick="CloseModal">
+        <div class="admin-modal" @onclick:stopPropagation="true">
+            <div class="admin-modal-title">@_modalTitle</div>
+            <div class="admin-modal-sub">Edit JSON row data (field names must match columns).</div>
+
+            <textarea class="admin-json" rows="12" @bind="_json"></textarea>
+
+            @if (!string.IsNullOrWhiteSpace(_modalError))
+            {
+                <div class="admin-error" style="margin-top:10px;">@_modalError</div>
+            }
+
+            <div style="display:flex; gap:10px; margin-top:12px; justify-content:flex-end; flex-wrap:wrap;">
+                <button class="admin-btn" @onclick="CloseModal" disabled="@_modalBusy">Cancel</button>
+                <button class="admin-btn admin-btn-primary" @onclick="SaveModal" disabled="@_modalBusy">@_modalPrimary</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<string> _tables = new();
+    private string _table = "users";
+    private string _q = "";
+    private int _take = 50;
+    private int _skip = 0;
+
+    private bool _loading;
+    private string? _error;
+    private TableResponse? _data;
+
+    private bool _modalOpen;
+    private bool _modalBusy;
+    private string _modalMode = "insert"; // insert|edit
+    private string _modalTitle = "";
+    private string _modalPrimary = "Save";
+    private string _json = "{}";
+    private string? _modalError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTables();
+        if (_tables.Count > 0)
+        {
+            _table = _tables[0];
+            await Reload();
+        }
+    }
+
+
+
+    private async Task LoadTables()
+    {
+        try
+        {
+            _tables = await Http.GetFromJsonAsync<List<string>>("api/admin/db/tables") ?? new();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task OnTableChanged()
+    {
+        _skip = 0;
+        await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var url = $"api/admin/db/table/{_table}?take={_take}&skip={_skip}";
+            if (!string.IsNullOrWhiteSpace(_q))
+                url += $"&q={Uri.EscapeDataString(_q)}";
+
+            _data = await Http.GetFromJsonAsync<TableResponse>(url);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+
+
+
+
+
+    private string Cell(Dictionary<string, object?> row, string name)
+    {
+        if (!row.TryGetValue(name, out var v) || v is null) return "";
+        return v.ToString() ?? "";
+    }
+
+    private void OpenInsert()
+    {
+        _modalMode = "insert";
+        _modalTitle = $"Add row: {_table}";
+        _modalPrimary = "Insert";
+        _json = "{\n  \"field\": \"value\"\n}";
+        _modalError = null;
+        _modalOpen = true;
+    }
+
+    private void OpenEdit(Dictionary<string, object?> row)
+    {
+        _modalMode = "edit";
+        _modalTitle = $"Edit row: {_table}";
+        _modalPrimary = "Update";
+        _json = System.Text.Json.JsonSerializer.Serialize(row, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        _modalError = null;
+        _modalOpen = true;
+    }
+
+    private async Task Delete(Dictionary<string, object?> row)
+    {
+        if (_data is null || string.IsNullOrWhiteSpace(_data.primaryKey))
+        {
+            _error = "Delete not supported: table has no primary key.";
+            return;
+        }
+
+        if (!row.TryGetValue(_data.primaryKey, out var idObj) || idObj is null)
+        {
+            _error = "Row has no primary key value.";
+            return;
+        }
+
+        var ok = await JS.InvokeAsync<bool>("confirm", $"Delete row {_data.primaryKey}={idObj} from {_table}?");
+        if (!ok) return;
+
+        try
+        {
+            var resp = await Http.DeleteAsync($"api/admin/db/table/{_table}/{Uri.EscapeDataString(idObj.ToString()!)}");
+            if (!resp.IsSuccessStatusCode)
+            {
+                _error = await resp.Content.ReadAsStringAsync();
+                return;
+            }
+            await Reload();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private void CloseModal()
+    {
+        if (_modalBusy) return;
+        _modalOpen = false;
+    }
+
+    private async Task SaveModal()
+    {
+        _modalBusy = true;
+        _modalError = null;
+
+        try
+        {
+            var doc = System.Text.Json.JsonDocument.Parse(_json);
+            var raw = doc.RootElement.GetRawText();
+
+            if (_modalMode == "insert")
+            {
+                var resp = await Http.PostAsync($"api/admin/db/table/{_table}", new StringContent(raw, System.Text.Encoding.UTF8, "application/json"));
+                if (!resp.IsSuccessStatusCode)
+                {
+                    _modalError = await resp.Content.ReadAsStringAsync();
+                    return;
+                }
+            }
+            else
+            {
+                if (_data is null || string.IsNullOrWhiteSpace(_data.primaryKey))
+                {
+                    _modalError = "Update not supported: table has no primary key.";
+                    return;
+                }
+
+                var row = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(_json,
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                if (row is null || !row.TryGetValue(_data.primaryKey, out var idObj) || idObj is null)
+                {
+                    _modalError = $"JSON must include primary key field '{_data.primaryKey}'.";
+                    return;
+                }
+
+                var resp = await Http.PutAsync(
+                    $"api/admin/db/table/{_table}/{Uri.EscapeDataString(idObj.ToString()!)}",
+                    new StringContent(raw, System.Text.Encoding.UTF8, "application/json")
+                );
+
+                if (!resp.IsSuccessStatusCode)
+                {
+                    _modalError = await resp.Content.ReadAsStringAsync();
+                    return;
+                }
+            }
+
+            _modalOpen = false;
+            await Reload();
+        }
+        catch (Exception ex)
+        {
+            _modalError = ex.Message;
+        }
+        finally
+        {
+            _modalBusy = false;
+        }
+    }
+
+    private async Task Prev()
+    {
+        _skip = Math.Max(0, _skip - _take);
+        await Reload();
+    }
+
+    private async Task Next()
+    {
+        _skip += _take;
+        await Reload();
+    }
+
+    private sealed class TableResponse
+    {
+        public string table { get; set; } = "";
+        public string? primaryKey { get; set; }
+        public long total { get; set; }
+        public List<ColDto> columns { get; set; } = new();
+        public List<Dictionary<string, object?>> rows { get; set; } = new();
+    }
+
+    private sealed class ColDto
+    {
+        public string name { get; set; } = "";
+        public string dataType { get; set; } = "";
+        public bool isNullable { get; set; }
+    }
+}

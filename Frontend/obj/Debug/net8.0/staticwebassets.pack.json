@@ -1,0 +1,97 @@
+{
+  "Files": [
+    {
+      "Id": "/app/Frontend/obj/Debug/net8.0/scopedcss/projectbundle/LittleHelperAI.Dashboard.bundle.scp.css",
+      "PackagePath": "staticwebassets/LittleHelperAI.Dashboard.bundle.scp.css"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/css/analysis-enhanced.css",
+      "PackagePath": "staticwebassets/css/analysis-enhanced.css"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/css/analysis-panel.css",
+      "PackagePath": "staticwebassets/css/analysis-panel.css"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/css/app.css",
+      "PackagePath": "staticwebassets/css/app.css"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/css/bootstrap.min.css",
+      "PackagePath": "staticwebassets/css/bootstrap.min.css"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/css/chat-enhanced.css",
+      "PackagePath": "staticwebassets/css/chat-enhanced.css"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/css/code-comparison.css",
+      "PackagePath": "staticwebassets/css/code-comparison.css"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/css/command-prompt.css",
+      "PackagePath": "staticwebassets/css/command-prompt.css"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/css/cyberpunk.css",
+      "PackagePath": "staticwebassets/css/cyberpunk.css"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/css/dark-mode.css",
+      "PackagePath": "staticwebassets/css/dark-mode.css"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/css/design-system.css",
+      "PackagePath": "staticwebassets/css/design-system.css"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/css/site.css",
+      "PackagePath": "staticwebassets/css/site.css"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/js/fileUploadInterop.js",
+      "PackagePath": "staticwebassets/js/fileUploadInterop.js"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/js/geolocation.js",
+      "PackagePath": "staticwebassets/js/geolocation.js"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/js/site.js",
+      "PackagePath": "staticwebassets/js/site.js"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/js/site.js.bak",
+      "PackagePath": "staticwebassets/js/site.js.bak"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/js/speechRecognition.js",
+      "PackagePath": "staticwebassets/js/speechRecognition.js"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/js/spellCheck.js",
+      "PackagePath": "staticwebassets/js/spellCheck.js"
+    },
+    {
+      "Id": "/app/Frontend/wwwroot/js/stripeInterop.js",
+      "PackagePath": "staticwebassets/js/stripeInterop.js"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.LittleHelperAI.Dashboard.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.build.LittleHelperAI.Dashboard.props",
+      "PackagePath": "build\\LittleHelperAI.Dashboard.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.buildMultiTargeting.LittleHelperAI.Dashboard.props",
+      "PackagePath": "buildMultiTargeting\\LittleHelperAI.Dashboard.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.buildTransitive.LittleHelperAI.Dashboard.props",
+      "PackagePath": "buildTransitive\\LittleHelperAI.Dashboard.props"
+    }
+  ],
+  "ElementsToRemove": []
+}

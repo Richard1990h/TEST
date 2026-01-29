@@ -1,0 +1,183 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<div class="admin-grid">
+    <div class="admin-card admin-card-wide">
+        <div class="admin-card-title">Admin Audit Log</div>
+        <div class="admin-card-sub">Every admin action (notifications, DB edits, etc.).</div>
+
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-top:12px;">
+            <div class="admin-form-field" style="min-width:280px;">
+                <label>Search</label>
+                <input @bind="_q" @bind:event="oninput" placeholder="action / entity / details" />
+            </div>
+            <button class="admin-btn admin-btn-primary" @onclick="Reload" disabled="@_loading">↻ Refresh</button>
+        </div>
+
+        @if (_loading)
+        {
+            <div class="admin-muted" style="margin-top:12px;">Loading…</div>
+        }
+        else if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="admin-error" style="margin-top:12px;">@_error</div>
+        }
+        else
+        {
+            <div style="display:flex; gap:10px; align-items:center; margin-top:10px;">
+                <span class="pill">Total: @_total</span>
+            </div>
+
+            <div class="admin-table-wrap" style="margin-top:10px;">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th style="width:90px;">Id</th>
+                            <th style="width:110px;">Admin</th>
+                            <th style="width:120px;">Action</th>
+                            <th style="width:140px;">Entity</th>
+                            <th style="width:140px;">EntityId</th>
+                            <th>Details</th>
+                            <th style="width:190px;">Created (UTC)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var x in _items)
+                        {
+                            <tr>
+                                <td>@x.id</td>
+                                <td><strong>@x.adminUserId</strong></td>
+                                <td><span class="pill @ActionPillClass(x.action)">@ActionIcon(x.action) @x.action</span></td>
+                                <td>@x.entity</td>
+                                <td>@x.entityId</td>
+                                <td style="max-width:300px; overflow:hidden; text-overflow:ellipsis;" title="@x.details">@x.details</td>
+                                <td>@x.createdUtc</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap;">
+                <button class="admin-btn" @onclick="Prev" disabled="@(_skip == 0 || _loading)">← Prev</button>
+                <button class="admin-btn" @onclick="Next" disabled="@((_skip + _take) >= _total || _loading)">Next →</button>
+                <span class="admin-muted">Page @((_skip / _take) + 1) of @Math.Ceiling((double)_total / _take)</span>
+            </div>
+        }
+    </div>
+
+    <div class="admin-card">
+        <div class="admin-card-title">What's Logged</div>
+        <div class="admin-card-sub">Admin actions are automatically tracked.</div>
+        <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; gap:8px; padding:10px; background:var(--bg-tertiary); border-radius:10px;">
+                <span style="color:var(--text-secondary);">Notification broadcasts</span>
+            </div>
+            <div style="display:flex; gap:8px; padding:10px; background:var(--bg-tertiary); border-radius:10px;">
+                <span style="color:var(--text-secondary);">Database inserts/updates/deletes</span>
+            </div>
+            <div style="display:flex; gap:8px; padding:10px; background:var(--bg-tertiary); border-radius:10px;">
+                <span style="color:var(--text-secondary);">User role changes</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .pill-insert { background: rgba(16, 185, 129, 0.15) !important; color: #10b981 !important; border-color: rgba(16, 185, 129, 0.3) !important; }
+    .pill-update { background: rgba(59, 130, 246, 0.15) !important; color: #3b82f6 !important; border-color: rgba(59, 130, 246, 0.3) !important; }
+    .pill-delete { background: rgba(239, 68, 68, 0.15) !important; color: #ef4444 !important; border-color: rgba(239, 68, 68, 0.3) !important; }
+    .pill-notification { background: rgba(234, 179, 8, 0.15) !important; color: #eab308 !important; border-color: rgba(234, 179, 8, 0.3) !important; }
+</style>
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+
+    private string _q = "";
+    private int _take = 200;
+    private int _skip = 0;
+
+    private long _total;
+    private List<Row> _items = new();
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var url = $"api/admin/audit?take={_take}&skip={_skip}";
+            if (!string.IsNullOrWhiteSpace(_q))
+                url += $"&q={Uri.EscapeDataString(_q)}";
+
+            var resp = await Http.GetFromJsonAsync<AuditResponse>(url);
+            _total = resp?.total ?? 0;
+            _items = resp?.items ?? new();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Prev()
+    {
+        _skip = Math.Max(0, _skip - _take);
+        await Reload();
+    }
+
+    private async Task Next()
+    {
+        _skip += _take;
+        await Reload();
+    }
+
+    private string ActionPillClass(string action)
+    {
+        return action.ToLower() switch
+        {
+            "insert" => "pill-insert",
+            "update" => "pill-update", 
+            "delete" => "pill-delete",
+            "notification" => "pill-notification",
+            _ => ""
+        };
+    }
+
+    private string ActionIcon(string action)
+    {
+        return action.ToLower() switch
+        {
+            "insert" => "➕",
+            "update" => "✏️",
+            "delete" => "🗑️",
+            "notification" => "🔔",
+            _ => "📝"
+        };
+    }
+
+    private sealed class AuditResponse
+    {
+        public long total { get; set; }
+        public List<Row> items { get; set; } = new();
+    }
+
+    private sealed class Row
+    {
+        public long id { get; set; }
+        public int adminUserId { get; set; }
+        public string action { get; set; } = "";
+        public string entity { get; set; } = "";
+        public string? entityId { get; set; }
+        public string details { get; set; } = "";
+        public DateTime createdUtc { get; set; }
+    }
+}

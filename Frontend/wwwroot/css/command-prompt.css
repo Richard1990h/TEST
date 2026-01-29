@@ -1,0 +1,418 @@
+/* ============================================
+   Command Prompt Style Chat UI
+   ============================================ */
+
+:root {
+    /* Command Prompt Colors */
+    --cmd-bg: #000000;
+    --cmd-text: #00ff00;
+    --cmd-text-secondary: #00aa00;
+    --cmd-border: #00ff00;
+    --cmd-user-prefix: #00ffff;
+    --cmd-bot-prefix: #00ff00;
+    --cmd-info-color: #ffff00;
+    --cmd-error-color: #ff0000;
+}
+
+[data-theme="dark"] {
+    --cmd-bg: #000000;
+    --cmd-text: #00ff00;
+    --cmd-text-secondary: #00aa00;
+    --cmd-border: #00ff00;
+    --cmd-user-prefix: #00ffff;
+    --cmd-bot-prefix: #00ff00;
+    --cmd-info-color: #ffff00;
+    --cmd-error-color: #ff0000;
+}
+
+/* Command Prompt Container */
+.chat-container.command-prompt {
+    background: var(--cmd-bg);
+    color: var(--cmd-text);
+    font-family: 'Courier New', 'Consolas', monospace;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.chat-container.command-prompt .chat-header {
+    background: var(--cmd-bg);
+    border-bottom: 2px solid var(--cmd-border);
+    padding: 1rem;
+    display: none;
+}
+
+.chat-container.command-prompt .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    background: var(--cmd-bg);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Message Wrapper - Command Prompt Style */
+.chat-container.command-prompt .message-wrapper {
+    display: block;
+    width: 100%;
+    padding: 0;
+    background: transparent;
+    border: none;
+    margin: 0;
+}
+
+.chat-container.command-prompt .message-wrapper.user {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+.chat-container.command-prompt .message-wrapper.bot {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+/* Message Content - Command Prompt Style */
+.chat-container.command-prompt .message-content {
+    max-width: 100%;
+    width: 100%;
+    display: block;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    flex: none;
+}
+
+/* Avatar - Hide in Command Prompt */
+.chat-container.command-prompt .avatar {
+    display: none;
+}
+
+/* Message Bubble - Command Prompt Style */
+.chat-container.command-prompt .message-bubble {
+    flex: 1;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--cmd-text);
+    word-break: break-word;
+    min-width: 0;
+    font-family: 'Courier New', 'Consolas', monospace;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin: 0;
+    padding: 0;
+}
+
+/* User Message Prefix */
+.chat-container.command-prompt .message-wrapper.user .message-bubble::before {
+    content: "C:\\> ";
+    color: var(--cmd-user-prefix);
+    font-weight: bold;
+}
+
+/* Bot Message Prefix */
+.chat-container.command-prompt .message-wrapper.bot .message-bubble::before {
+    content: "";
+}
+
+/* Username Label - Hide in Command Prompt */
+.chat-container.command-prompt .message-wrapper .message-content > div:first-child {
+    display: none;
+}
+
+/* Markdown Body in Command Prompt */
+.chat-container.command-prompt .markdown-body {
+    color: var(--cmd-text);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    font-family: 'Courier New', 'Consolas', monospace;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin: 0;
+    padding: 0;
+}
+
+.chat-container.command-prompt .markdown-body p {
+    margin: 0;
+    padding: 0;
+}
+
+.chat-container.command-prompt .markdown-body h1,
+.chat-container.command-prompt .markdown-body h2,
+.chat-container.command-prompt .markdown-body h3 {
+    color: var(--cmd-info-color);
+    margin: 0.5rem 0;
+    font-weight: bold;
+}
+
+.chat-container.command-prompt .markdown-body code {
+    color: var(--cmd-text);
+    background: transparent;
+    padding: 0;
+    border: none;
+}
+
+.chat-container.command-prompt .markdown-body pre {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    color: var(--cmd-text);
+    overflow-x: auto;
+}
+
+/* Code Block in Command Prompt */
+.chat-container.command-prompt .code-block-wrapper {
+    margin: 0.5rem 0;
+    border-radius: 0;
+    overflow: visible;
+    background: transparent;
+    box-shadow: none;
+    border: none;
+}
+
+.chat-container.command-prompt .code-block-header {
+    display: none;
+}
+
+.chat-container.command-prompt .code-block {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow-x: auto;
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--cmd-text);
+    white-space: pre;
+}
+
+.chat-container.command-prompt .code-block code {
+    background: transparent !important;
+    color: var(--cmd-text);
+    padding: 0;
+    border-radius: 0;
+    font-family: inherit;
+}
+
+/* Inline Code in Command Prompt */
+.chat-container.command-prompt .inline-code {
+    background: transparent;
+    color: var(--cmd-text);
+    padding: 0;
+    border-radius: 0;
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-size: inherit;
+    font-weight: normal;
+    border: none;
+}
+
+/* Message Actions - Hide in Command Prompt */
+.chat-container.command-prompt .message-actions {
+    display: none;
+}
+
+/* Thinking Indicator */
+.chat-container.command-prompt .thinking-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--cmd-text);
+    font-size: 0.95rem;
+    font-style: normal;
+    font-family: 'Courier New', 'Consolas', monospace;
+}
+
+.chat-container.command-prompt .dot-flashing {
+    width: 8px;
+    height: 8px;
+    border-radius: 0;
+    background-color: var(--cmd-text);
+    color: var(--cmd-text);
+    animation: dot-flashing 1s infinite linear alternate;
+    animation-delay: 0.5s;
+    display: inline-block;
+}
+
+/* Chat Input Area - Command Prompt Style */
+.chat-container.command-prompt .chat-input-area {
+    padding: 1rem;
+    background: var(--cmd-bg);
+    border-top: 2px solid var(--cmd-border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.chat-container.command-prompt .input-wrapper {
+    display: flex;
+    gap: 0.5rem;
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    border: none;
+    transition: none;
+}
+
+.chat-container.command-prompt .input-wrapper:focus-within {
+    border-color: transparent;
+    background: transparent;
+}
+
+.chat-container.command-prompt .chat-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 0;
+    font-size: 0.95rem;
+    outline: none;
+    color: var(--cmd-text);
+    resize: none;
+    min-height: 30px;
+    max-height: 200px;
+    font-family: 'Courier New', 'Consolas', monospace;
+    caret-color: var(--cmd-text);
+}
+
+.chat-container.command-prompt .chat-input::placeholder {
+    color: var(--cmd-text-secondary);
+    opacity: 0.7;
+}
+
+.chat-container.command-prompt .action-btn {
+    width: auto;
+    height: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0;
+    border: none;
+    cursor: pointer;
+    transition: none;
+    background: transparent;
+    color: var(--cmd-text);
+    padding: 0;
+    margin: 0;
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-size: 0.95rem;
+}
+
+.chat-container.command-prompt .action-btn:hover {
+    background: transparent;
+    color: var(--cmd-info-color);
+}
+
+.chat-container.command-prompt .action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.chat-container.command-prompt .send-btn {
+    background: transparent;
+    color: var(--cmd-text);
+}
+
+.chat-container.command-prompt .send-btn:hover:not(:disabled) {
+    background: transparent;
+    color: var(--cmd-info-color);
+}
+
+/* File Upload Preview - Hide in Command Prompt */
+.chat-container.command-prompt .uploaded-files-preview {
+    display: none;
+}
+
+/* Voice Recording Indicator */
+.chat-container.command-prompt .voice-recording-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    margin-bottom: 0.5rem;
+    color: var(--cmd-error-color);
+}
+
+.chat-container.command-prompt .voice-recording-pulse {
+    width: 8px;
+    height: 8px;
+    border-radius: 0;
+    background: var(--cmd-error-color);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Stop Generating Button */
+.chat-container.command-prompt .stop-generating-btn {
+    background: transparent;
+    color: var(--cmd-error-color);
+    border: 1px solid var(--cmd-error-color);
+    padding: 0.5rem 1rem;
+    border-radius: 0;
+    cursor: pointer;
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-size: 0.95rem;
+    margin: 0.5rem;
+}
+
+.chat-container.command-prompt .stop-generating-btn:hover {
+    background: var(--cmd-error-color);
+    color: var(--cmd-bg);
+}
+
+/* Scrollbar Styling for Command Prompt */
+.chat-container.command-prompt .chat-messages::-webkit-scrollbar {
+    width: 12px;
+}
+
+.chat-container.command-prompt .chat-messages::-webkit-scrollbar-track {
+    background: var(--cmd-bg);
+}
+
+.chat-container.command-prompt .chat-messages::-webkit-scrollbar-thumb {
+    background: var(--cmd-border);
+    border-radius: 0;
+}
+
+.chat-container.command-prompt .chat-messages::-webkit-scrollbar-thumb:hover {
+    background: var(--cmd-info-color);
+}
+
+/* Ensure lines break properly */
+.chat-container.command-prompt .message-wrapper {
+    display: block;
+}
+
+.chat-container.command-prompt .message-bubble {
+    display: block;
+}
+
+/* Line breaks and spacing */
+.chat-container.command-prompt .markdown-body br {
+    display: block;
+    content: "";
+}
+
+/* Ensure each message line appears on its own line */
+.chat-container.command-prompt .message-wrapper + .message-wrapper {
+    margin-top: 0;
+}
+
+/* Credits Badge - Hide in Command Prompt */
+.chat-container.command-prompt .credits-badge {
+    display: none;
+}
+
+/* Command Prompt Scrollbar - Firefox */
+.chat-container.command-prompt .chat-messages {
+    scrollbar-color: var(--cmd-border) var(--cmd-bg);
+    scrollbar-width: thin;
+}

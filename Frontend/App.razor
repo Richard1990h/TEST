@@ -1,0 +1,10 @@
+@using LittleHelperAI.Dashboard.Shared
+
+<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="typeof(MainLayout)" />
+    </Found>
+    <NotFound>
+        <h3 style="color:red">Page not found</h3>
+    </NotFound>
+</Router>

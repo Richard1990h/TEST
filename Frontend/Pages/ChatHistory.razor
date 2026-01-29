@@ -1,0 +1,48 @@
+@page "/chat-history"
+@inject HttpClient Http
+@inject UserSessionService Session
+
+<h3>🕘 Chat History</h3>
+
+@if (messages == null)
+{
+    <p>Loading chat history...</p>
+}
+else if (!messages.Any())
+{
+    <p>No chat history yet. Start a new chat!</p>
+}
+else
+{
+    <ul class="chat-history-list">
+        @foreach (var msg in messages)
+        {
+            <li class="chat-history-item">
+                <strong>@msg.Title</strong><br />
+                <small>@msg.Timestamp.ToLocalTime().ToString("g")</small>
+                <p class="preview">@msg.Message</p>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private List<ChatHistoryItem> messages = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = Session.GetUser();
+        if (user != null)
+        {
+            messages = await Http.GetFromJsonAsync<List<ChatHistoryItem>>($"api/chat/history/{user.Id}") ?? new();
+        }
+    }
+
+    public class ChatHistoryItem
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string Reply { get; set; } = string.Empty;
+        public DateTime Timestamp { get; set; }
+    }
+}

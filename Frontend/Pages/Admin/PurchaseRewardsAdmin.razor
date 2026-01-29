@@ -1,0 +1,479 @@
+@inject HttpClient Http
+
+<div class="admin-card" style="margin-bottom: 1.5rem;">
+    <div class="admin-card-title">Purchase-Based Referral Rewards</div>
+    <div class="admin-card-sub">Configure bonus credits awarded when users make purchases</div>
+
+    @if (isLoading)
+    {
+        <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+            <span class="loading-spinner"></span> Loading settings...
+        </div>
+    }
+    else
+    {
+        <!-- Explanation Section -->
+        <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(139, 92, 246, 0.08)); 
+                    border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 12px; padding: 1rem; margin: 1rem 0;">
+            <div style="font-weight: 600; color: var(--primary-500); margin-bottom: 0.5rem;">How Purchase Rewards Work</div>
+            <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
+                <div style="margin-bottom: 0.5rem;">• <b>Referrer Reward:</b> When a referred user buys credits, the person who shared the referral code gets bonus credits.</div>
+                <div style="margin-bottom: 0.5rem;">• <b>Buyer Bonus:</b> When a referred user buys credits, they also get a bonus (incentive for using referral codes).</div>
+                <div>• <b>Owner Purchase Reward:</b> When a referral code owner buys credits, ALL people who used their code get bonus credits.</div>
+            </div>
+        </div>
+
+        <!-- Plans Grid -->
+        <div style="margin-top: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div style="font-weight: 600; font-size: 14px; color: var(--text-primary);">Per-Plan Reward Configuration</div>
+                <button class="admin-btn admin-btn-secondary" @onclick="SaveAllSettings" disabled="@isSaving" style="font-size: 13px;">
+                    @if (isSaving)
+                    {
+                        <span class="loading-spinner"></span>
+                    }
+                    Save All Changes
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(statusMessage))
+            {
+                <div style="margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 8px; font-size: 13px;
+                            background: @(isSuccess ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)");
+                            color: @(isSuccess ? "#22c55e" : "#ef4444"); border: 1px solid @(isSuccess ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)");">
+                    @statusMessage
+                </div>
+            }
+
+            <div class="admin-table-wrap" style="max-height: 500px;">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Plan</th>
+                            <th>Credits</th>
+                            <th>Type</th>
+                            <th style="text-align: center;">
+                                <span title="Credits given to the referrer when their referral buys this plan">Referrer Reward</span>
+                            </th>
+                            <th style="text-align: center;">
+                                <span title="Bonus credits given to the buyer who used a referral code">Buyer Bonus</span>
+                            </th>
+                            <th style="text-align: center;">
+                                <span title="Credits given to all referrals when the code owner buys this plan">Owner Purchase</span>
+                            </th>
+                            <th style="text-align: center;">Enabled</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var plan in planSettings)
+                        {
+                            <tr>
+                                <td style="font-weight: 600;">@plan.PlanName</td>
+                                <td>
+                                    <span class="pill" style="background: rgba(59, 130, 246, 0.1); color: var(--primary-500);">
+                                        @plan.Credits
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="pill" style="background: @(plan.PlanType == "Subscription" ? "rgba(139, 92, 246, 0.1)" : "rgba(34, 197, 94, 0.1)"); 
+                                                          color: @(plan.PlanType == "Subscription" ? "#8b5cf6" : "#22c55e");">
+                                        @plan.PlanType
+                                    </span>
+                                </td>
+                                <td style="text-align: center;">
+                                    <input type="number" step="0.5" min="0" @bind="plan.ReferrerRewardCredits" 
+                                           style="width: 80px; text-align: center;" placeholder="0" />
+                                </td>
+                                <td style="text-align: center;">
+                                    <input type="number" step="0.5" min="0" @bind="plan.RefereeRewardCredits" 
+                                           style="width: 80px; text-align: center;" placeholder="0" />
+                                </td>
+                                <td style="text-align: center;">
+                                    <input type="number" step="0.5" min="0" @bind="plan.OwnerPurchaseRewardCredits" 
+                                           style="width: 80px; text-align: center;" placeholder="0" />
+                                </td>
+                                <td style="text-align: center;">
+                                    <input type="checkbox" @bind="plan.IsEnabled" 
+                                           style="width: 18px; height: 18px; accent-color: var(--primary-500);" />
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Statistics Section -->
+<div class="admin-card" style="margin-bottom: 1.5rem;">
+    <div class="admin-card-title">Purchase Reward Statistics</div>
+    <div class="admin-card-sub">Overview of purchase-based reward distributions</div>
+
+    <div class="admin-stats" style="margin-top: 1rem;">
+        <div class="stat">
+            <div class="stat-label">Total Rewards Given</div>
+            <div class="stat-value">@stats.TotalPurchaseRewards</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Credits Distributed</div>
+            <div class="stat-value">@stats.TotalCreditsAwarded.ToString("N0")</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Referrers Benefited</div>
+            <div class="stat-value">@stats.UniqueReferrersBenefited</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Referees Benefited</div>
+            <div class="stat-value">@stats.UniqueRefereesBenefited</div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Purchase Rewards -->
+<div class="admin-card" style="margin-bottom: 1.5rem;">
+    <div class="admin-card-title">Recent Purchase Rewards</div>
+    <div class="admin-card-sub">Latest purchase-triggered reward transactions</div>
+
+    @if (!stats.RecentRewards.Any())
+    {
+        <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;"></div>
+            <div>No purchase rewards distributed yet. They will appear here when referred users make purchases.</div>
+        </div>
+    }
+    else
+    {
+        <div class="admin-table-wrap" style="margin-top: 1rem; max-height: 400px;">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Purchaser</th>
+                        <th>Beneficiary</th>
+                        <th>Plan</th>
+                        <th>Reward Type</th>
+                        <th>Credits</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var reward in stats.RecentRewards)
+                    {
+                        <tr>
+                            <td style="color: var(--text-secondary); font-size: 12px;">@reward.CreatedAt.ToString("MMM dd, yyyy HH:mm")</td>
+                            <td style="font-weight: 600;">@reward.PurchaserUsername</td>
+                            <td>@reward.BeneficiaryUsername</td>
+                            <td><code style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px; font-size: 11px;">@reward.PlanName</code></td>
+                            <td>
+                                <span class="pill" style="@GetRewardTypeStyle(reward.RewardType)">
+                                    @GetRewardTypeLabel(reward.RewardType)
+                                </span>
+                            </td>
+                            <td><span style="color: #22c55e; font-weight: 600;">+@reward.CreditsAwarded.ToString("N1")</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- Security Audit Section -->
+<div class="admin-card">
+    <div class="admin-card-title">🔐 Credit Security Audit</div>
+    <div class="admin-card-sub">Monitor all credit operations for security (click to expand)</div>
+    
+    <details style="margin-top: 1rem;">
+        <summary style="cursor: pointer; padding: 0.75rem; background: var(--bg-tertiary); border-radius: 8px; font-weight: 600;">
+            View Recent Credit Audit Log (@auditLogs.Count entries loaded)
+        </summary>
+        
+        @if (isLoadingAudit)
+        {
+            <div style="padding: 1rem; text-align: center; color: var(--text-secondary);">
+                <span class="loading-spinner"></span> Loading audit log...
+            </div>
+        }
+        else if (!auditLogs.Any())
+        {
+            <div style="padding: 1rem; text-align: center; color: var(--text-secondary);">
+                No audit entries yet.
+            </div>
+        }
+        else
+        {
+            <div class="admin-table-wrap" style="margin-top: 0.5rem; max-height: 300px;">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>User</th>
+                            <th>Operation</th>
+                            <th>Amount</th>
+                            <th>Before</th>
+                            <th>After</th>
+                            <th>Validated</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in auditLogs)
+                        {
+                            <tr>
+                                <td style="font-size: 11px; color: var(--text-secondary);">@log.CreatedAt.ToString("MMM dd HH:mm:ss")</td>
+                                <td style="font-weight: 500;">@log.Username</td>
+                                <td>
+                                    <code style="font-size: 10px; background: var(--bg-tertiary); padding: 2px 4px; border-radius: 3px;">
+                                        @log.OperationType
+                                    </code>
+                                </td>
+                                <td style="color: @(log.CreditsAmount >= 0 ? "#22c55e" : "#ef4444"); font-weight: 600;">
+                                    @(log.CreditsAmount >= 0 ? "+" : "")@log.CreditsAmount.ToString("N1")
+                                </td>
+                                <td style="color: var(--text-secondary);">@log.CreditsBefore.ToString("N1")</td>
+                                <td style="color: var(--text-secondary);">@log.CreditsAfter.ToString("N1")</td>
+                                <td style="text-align: center;">
+                                    @if (log.IsValidated)
+                                    {
+                                        <span style="color: #22c55e;">✅</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="color: #f59e0b;">⏳</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </details>
+</div>
+
+<style>
+    .loading-spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(59, 130, 246, 0.3);
+        border-top-color: var(--primary-500);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    details > summary {
+        list-style: none;
+    }
+    details > summary::-webkit-details-marker {
+        display: none;
+    }
+    details[open] > summary {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+    }
+</style>
+
+@code {
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private bool isLoadingAudit = false;
+    private string statusMessage = "";
+    private bool isSuccess = false;
+
+    // Plan settings
+    private List<PlanRewardSettingsDto> planSettings = new();
+    
+    // Stats
+    private PurchaseRewardStatsDto stats = new();
+    
+    // Audit logs
+    private List<CreditAuditLogDto> auditLogs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            // Load plan settings
+            var plansResponse = await Http.GetAsync("api/admin/purchase-rewards/plans");
+            if (plansResponse.IsSuccessStatusCode)
+            {
+                planSettings = await plansResponse.Content.ReadFromJsonAsync<List<PlanRewardSettingsDto>>() ?? new();
+            }
+
+            // Load stats
+            var statsResponse = await Http.GetAsync("api/admin/purchase-rewards/stats");
+            if (statsResponse.IsSuccessStatusCode)
+            {
+                stats = await statsResponse.Content.ReadFromJsonAsync<PurchaseRewardStatsDto>() ?? new();
+            }
+
+            // Load audit logs
+            await LoadAuditLogs();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading purchase rewards data: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadAuditLogs()
+    {
+        isLoadingAudit = true;
+        try
+        {
+            var auditResponse = await Http.GetAsync("api/admin/purchase-rewards/audit-log?page=1&pageSize=50");
+            if (auditResponse.IsSuccessStatusCode)
+            {
+                var result = await auditResponse.Content.ReadFromJsonAsync<AuditLogResponse>();
+                auditLogs = result?.Data ?? new();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading audit logs: {ex.Message}");
+        }
+        finally
+        {
+            isLoadingAudit = false;
+        }
+    }
+
+    private async Task SaveAllSettings()
+    {
+        isSaving = true;
+        statusMessage = "";
+        int successCount = 0;
+        int failCount = 0;
+
+        try
+        {
+            foreach (var plan in planSettings)
+            {
+                var request = new
+                {
+                    PlanId = plan.PlanId,
+                    ReferrerRewardCredits = plan.ReferrerRewardCredits,
+                    RefereeRewardCredits = plan.RefereeRewardCredits,
+                    OwnerPurchaseRewardCredits = plan.OwnerPurchaseRewardCredits,
+                    IsEnabled = plan.IsEnabled
+                };
+
+                var response = await Http.PostAsJsonAsync("api/admin/purchase-rewards/plans/update", request);
+                
+                if (response.IsSuccessStatusCode)
+                    successCount++;
+                else
+                    failCount++;
+            }
+
+            if (failCount == 0)
+            {
+                isSuccess = true;
+                statusMessage = $"✅ All {successCount} plan settings saved successfully!";
+            }
+            else
+            {
+                isSuccess = false;
+                statusMessage = $"⚠️ {successCount} saved, {failCount} failed";
+            }
+        }
+        catch (Exception ex)
+        {
+            isSuccess = false;
+            statusMessage = $"❌ Error: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+            
+            // Clear message after 4 seconds
+            await Task.Delay(4000);
+            statusMessage = "";
+            StateHasChanged();
+        }
+    }
+
+    private string GetRewardTypeLabel(string rewardType) => rewardType switch
+    {
+        "REFERRER_REWARD" => "🎯 Referrer",
+        "REFEREE_REWARD" => "🆕 Buyer Bonus",
+        "OWNER_PURCHASE_REWARD" => "👥 Owner Purch.",
+        _ => rewardType
+    };
+
+    private string GetRewardTypeStyle(string rewardType) => rewardType switch
+    {
+        "REFERRER_REWARD" => "background: rgba(59, 130, 246, 0.1); color: var(--primary-500);",
+        "REFEREE_REWARD" => "background: rgba(34, 197, 94, 0.1); color: #22c55e;",
+        "OWNER_PURCHASE_REWARD" => "background: rgba(139, 92, 246, 0.1); color: #8b5cf6;",
+        _ => "background: var(--bg-tertiary); color: var(--text-secondary);"
+    };
+
+    // DTOs
+    private class PlanRewardSettingsDto
+    {
+        public int PlanId { get; set; }
+        public string PlanName { get; set; } = "";
+        public int Credits { get; set; }
+        public string PlanType { get; set; } = "";
+        public double ReferrerRewardCredits { get; set; }
+        public double RefereeRewardCredits { get; set; }
+        public double OwnerPurchaseRewardCredits { get; set; }
+        public bool IsEnabled { get; set; }
+    }
+
+    private class PurchaseRewardStatsDto
+    {
+        public int TotalPurchaseRewards { get; set; }
+        public double TotalCreditsAwarded { get; set; }
+        public int UniqueReferrersBenefited { get; set; }
+        public int UniqueRefereesBenefited { get; set; }
+        public List<RecentPurchaseRewardDto> RecentRewards { get; set; } = new();
+    }
+
+    private class RecentPurchaseRewardDto
+    {
+        public int Id { get; set; }
+        public string PurchaserUsername { get; set; } = "";
+        public string BeneficiaryUsername { get; set; } = "";
+        public string PlanName { get; set; } = "";
+        public string RewardType { get; set; } = "";
+        public double CreditsAwarded { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    private class CreditAuditLogDto
+    {
+        public string Id { get; set; } = "";
+        public string Username { get; set; } = "";
+        public string OperationType { get; set; } = "";
+        public double CreditsAmount { get; set; }
+        public double CreditsBefore { get; set; }
+        public double CreditsAfter { get; set; }
+        public string SourceType { get; set; } = "";
+        public bool IsValidated { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    private class AuditLogResponse
+    {
+        public List<CreditAuditLogDto> Data { get; set; } = new();
+        public int Total { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+    }
+}

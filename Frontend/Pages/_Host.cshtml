@@ -1,0 +1,133 @@
+@page "/"
+@namespace LittleHelperAI.Dashboard.Pages
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@inject IConfiguration Configuration
+
+<!DOCTYPE html>
+<html lang="en">
+<script>
+    // Apply theme IMMEDIATELY before any rendering
+    (function() {
+        var theme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', theme);
+    })();
+</script>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Little Helper AI - ChatGPT-like AI Assistant</title>
+    <base href="~/" />
+
+    <!-- ✅ Global CSS -->
+    <link rel="stylesheet" href="css/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/cyberpunk.css" />
+    <link rel="stylesheet" href="css/site.css" />
+    <link rel="stylesheet" href="css/chat-enhanced.css" />
+    
+    <!-- ✅ Syntax Highlighting - GitHub Dark Theme -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    
+    <!-- ✅ Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- ✅ Stripe.js from Stripe CDN -->
+    <script src="https://js.stripe.com/v3/"></script>
+    
+    <style>
+        /* Ensure smooth theme transitions */
+        * {
+            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <app>
+        <component type="typeof(App)" render-mode="ServerPrerendered" />
+    </app>
+
+    <!-- ✅ Core Blazor script -->
+    <script src="_framework/blazor.server.js"></script>
+
+    <!-- ✅ Markdown & Syntax Highlighting -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
+    <!-- ✅ Additional language support for Highlight.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/csharp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/cpp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/go.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/rust.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/json.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/markdown.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/diff.min.js"></script>
+
+    <!-- ✅ Custom JS - Enhanced -->
+    <script src="js/site.js"></script>
+    <script src="js/speechRecognition.js"></script>
+    <script src="js/spellCheck.js"></script>
+    <script src="js/geolocation.js"></script>
+    <script src="js/fileUploadInterop.js"></script>
+    <script src="js/fixInterop.js"></script>
+
+    <!-- ✅ Stripe Interop -->
+    <script type="module" src="js/stripeInterop.js"></script>
+
+    <!-- ✅ Initialize on load -->
+    <script>
+        // Set backend API URL for JavaScript functions
+        window.backendApiUrl = '@(Configuration["BackendApi:BaseUrl"] ?? "http://localhost:8001")';
+        console.log('[Config] Backend API URL:', window.backendApiUrl);
+        
+        // Theme management functions for Blazor interop
+        window.themeManager = {
+            getTheme: function() {
+                return localStorage.getItem('theme') || 'light';
+            },
+            setTheme: function(theme) {
+                localStorage.setItem('theme', theme);
+                document.documentElement.setAttribute('data-theme', theme);
+                document.body.setAttribute('data-theme', theme);
+                console.log('[Theme] Set to:', theme);
+            },
+            applyTheme: function() {
+                var theme = this.getTheme();
+                document.documentElement.setAttribute('data-theme', theme);
+                document.body.setAttribute('data-theme', theme);
+                console.log('[Theme] Applied:', theme);
+                return theme;
+            }
+        };
+        
+        // Apply theme on body load
+        window.themeManager.applyTheme();
+        
+        // Scroll helper
+        window.scrollToBottom = (element) => {
+            if (element) {
+                element.scrollTop = element.scrollHeight;
+            }
+        };
+        
+        // Initialize syntax highlighting when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof hljs !== 'undefined') {
+                hljs.configure({
+                    languages: ['python', 'javascript', 'typescript', 'csharp', 'java', 'cpp', 'go', 'rust', 'sql', 'bash', 'json', 'xml', 'yaml', 'markdown', 'diff']
+                });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "New Profile",
+    "Projects": [
+      {
+        "Path": "Backend\\LittleHelperAI.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "Frontend\\LittleHelperAI.Dashboard.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

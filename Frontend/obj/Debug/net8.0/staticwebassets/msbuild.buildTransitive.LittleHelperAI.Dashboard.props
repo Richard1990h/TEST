@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="../buildMultiTargeting/LittleHelperAI.Dashboard.props" />
+</Project>

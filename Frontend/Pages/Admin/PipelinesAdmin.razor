@@ -1,0 +1,3037 @@
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@inject HttpClient Http
+
+<div class="pipelines-admin">
+    <div class="pipelines-header">
+        <div class="pipelines-title-row">
+            <h2>Pipeline Management</h2>
+            <div class="pipelines-actions">
+                <button class="admin-btn admin-btn-primary" @onclick="CreateNewPipeline">
+                    + New Pipeline
+                </button>
+                <button class="admin-btn" @onclick="RefreshPipelines">
+                    Refresh
+                </button>
+                <button class="admin-btn admin-btn-workspace" @onclick="OpenWorkspace" title="Open Workspace Preview">
+                    <span class="workspace-icon">&#128194;</span> Workspace
+                </button>
+            </div>
+        </div>
+        <div class="pipelines-tabs">
+            <button class="tab-btn @(ActiveTab == "list" ? "active" : "")" @onclick="@(() => ActiveTab = "list")">
+                Pipelines
+            </button>
+            <button class="tab-btn @(ActiveTab == "executions" ? "active" : "")" @onclick="@(() => ActiveTab = "executions")">
+                Executions
+            </button>
+            <button class="tab-btn @(ActiveTab == "registry" ? "active" : "")" @onclick="@(() => ActiveTab = "registry")">
+                Step Registry
+            </button>
+            <button class="tab-btn @(ActiveTab == "proposals" ? "active" : "")" @onclick="@(() => ActiveTab = "proposals")">
+                LLM Proposals
+            </button>
+            <button class="tab-btn @(ActiveTab == "metrics" ? "active" : "")" @onclick="@(() => ActiveTab = "metrics")">
+                Metrics
+            </button>
+        </div>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="pipelines-loading">
+            <div class="loading-spinner"></div>
+            <span>Loading pipelines...</span>
+        </div>
+    }
+    else
+    {
+        @switch (ActiveTab)
+        {
+            case "list":
+                <div class="pipelines-list-view">
+                    <div class="pipelines-filters">
+                        <input type="text" placeholder="Search pipelines..." @bind="SearchQuery" @bind:event="oninput" class="search-input" />
+                        <select @bind="StatusFilter" class="filter-select">
+                            <option value="">All Statuses</option>
+                            <option value="active">Active</option>
+                            <option value="draft">Draft</option>
+                            <option value="archived">Archived</option>
+                        </select>
+                    </div>
+
+                    <div class="pipelines-grid">
+                        @foreach (var pipeline in FilteredPipelines)
+                        {
+                            var isPrimary = PrimaryPipelineId == pipeline.Id;
+                            <div class="pipeline-card @(SelectedPipeline?.Id == pipeline.Id ? "selected" : "") @(isPrimary ? "is-primary" : "")" @onclick="@(() => SelectPipeline(pipeline))">
+                                <div class="pipeline-card-header">
+                                    <div class="pipeline-name-row">
+                                        <div class="pipeline-name">@pipeline.Name</div>
+                                        @if (isPrimary)
+                                        {
+                                            <span class="primary-badge">PRIMARY</span>
+                                        }
+                                    </div>
+                                    <span class="pipeline-status status-@pipeline.Status.ToLower()">@pipeline.Status</span>
+                                </div>
+                                <div class="pipeline-card-meta">
+                                    <span>v@pipeline.Version</span>
+                                    <span>@pipeline.StepCount steps</span>
+                                </div>
+                                <div class="pipeline-card-desc">@pipeline.Description</div>
+
+                                @* Keywords Section *@
+                                <div class="pipeline-keywords" @onclick:stopPropagation="true">
+                                    <div class="keywords-header">
+                                        <span class="keywords-label">Keywords:</span>
+                                        <button class="keyword-add-btn" @onclick="@(() => OpenKeywordEditor(pipeline))" title="Add Keywords">+</button>
+                                    </div>
+                                    <div class="keywords-list">
+                                        @if (pipeline.Keywords?.Any() == true)
+                                        {
+                                            @foreach (var keyword in pipeline.Keywords.Take(4))
+                                            {
+                                                <span class="keyword-tag">@keyword</span>
+                                            }
+                                            @if (pipeline.Keywords.Count > 4)
+                                            {
+                                                <span class="keyword-more">+@(pipeline.Keywords.Count - 4) more</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="no-keywords">No keywords</span>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="pipeline-card-footer">
+                                    <span class="pipeline-updated">Updated @pipeline.UpdatedAt.ToString("MMM dd, HH:mm")</span>
+                                    <div class="pipeline-card-actions">
+                                        <button class="primary-btn @(isPrimary ? "is-active" : "")"
+                                                title="@(isPrimary ? "This is the primary pipeline" : "Set as primary pipeline")"
+                                                @onclick="@(() => SetAsPrimary(pipeline))"
+                                                @onclick:stopPropagation="true">
+                                            <span class="primary-icon">&#9679;</span>
+                                        </button>
+                                        <button class="icon-btn" title="Edit" @onclick="@(() => EditPipeline(pipeline))" @onclick:stopPropagation="true">
+                                            <span class="icon">&#9998;</span>
+                                        </button>
+                                        <button class="icon-btn" title="Run" @onclick="@(() => RunPipeline(pipeline))" @onclick:stopPropagation="true">
+                                            <span class="icon">&#9654;</span>
+                                        </button>
+                                        <button class="icon-btn" title="Duplicate" @onclick="@(() => DuplicatePipeline(pipeline))" @onclick:stopPropagation="true">
+                                            <span class="icon">&#10697;</span>
+                                        </button>
+                                        <button class="icon-btn icon-btn-danger" title="Delete" @onclick="@(() => ConfirmDeletePipeline(pipeline))" @onclick:stopPropagation="true">
+                                            <span class="icon">&#128465;</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    @if (SelectedPipeline != null)
+                    {
+                        <div class="pipeline-details">
+                            <div class="details-header">
+                                <h3>@SelectedPipeline.Name</h3>
+                                <button class="admin-btn admin-btn-xs" @onclick="@(() => SelectedPipeline = null)">Close</button>
+                            </div>
+                            <div class="details-content">
+                                <div class="details-section">
+                                    <h4>Pipeline Info</h4>
+                                    <div class="info-grid">
+                                        <div class="info-item">
+                                            <span class="info-label">ID</span>
+                                            <span class="info-value">@SelectedPipeline.Id</span>
+                                        </div>
+                                        <div class="info-item">
+                                            <span class="info-label">Version</span>
+                                            <span class="info-value">@SelectedPipeline.Version</span>
+                                        </div>
+                                        <div class="info-item">
+                                            <span class="info-label">Status</span>
+                                            <span class="info-value">@SelectedPipeline.Status</span>
+                                        </div>
+                                        <div class="info-item">
+                                            <span class="info-label">Created</span>
+                                            <span class="info-value">@SelectedPipeline.CreatedAt.ToString("yyyy-MM-dd HH:mm")</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="details-section">
+                                    <h4>Steps (@SelectedPipeline.Steps.Count)</h4>
+                                    <div class="steps-flow">
+                                        @foreach (var step in SelectedPipeline.Steps)
+                                        {
+                                            <div class="step-node">
+                                                <div class="step-type">@step.Type</div>
+                                                <div class="step-id">@step.Id</div>
+                                                @if (step.DependsOn?.Any() == true)
+                                                {
+                                                    <div class="step-deps">
+                                                        Depends: @string.Join(", ", step.DependsOn)
+                                                    </div>
+                                                }
+                                            </div>
+                                            @if (step != SelectedPipeline.Steps.Last())
+                                            {
+                                                <div class="step-connector">
+                                                    <span class="connector-arrow">&#8595;</span>
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="details-section">
+                                    <h4>Recent Executions</h4>
+                                    @if (SelectedPipelineExecutions.Any())
+                                    {
+                                        <div class="executions-mini-list">
+                                            @foreach (var exec in SelectedPipelineExecutions.Take(5))
+                                            {
+                                                <div class="execution-mini-item">
+                                                    <span class="exec-status status-@exec.Status.ToLower()">@exec.Status</span>
+                                                    <span class="exec-id">@exec.Id[..8]...</span>
+                                                    <span class="exec-duration">@exec.Duration.TotalSeconds.ToString("F1")s</span>
+                                                    <span class="exec-time">@exec.StartedAt.ToString("HH:mm:ss")</span>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="no-executions">No executions yet</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+                break;
+
+            case "executions":
+                <div class="executions-view">
+                    <div class="admin-table-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Execution ID</th>
+                                    <th>Pipeline</th>
+                                    <th>Status</th>
+                                    <th>Started</th>
+                                    <th>Duration</th>
+                                    <th>Steps</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var exec in Executions)
+                                {
+                                    <tr class="@(exec.Status == "Running" ? "row-running" : "")">
+                                        <td>
+                                            <code class="exec-id-code">@exec.Id[..12]...</code>
+                                        </td>
+                                        <td>@exec.PipelineName</td>
+                                        <td>
+                                            <span class="exec-status-badge status-@exec.Status.ToLower()">
+                                                @exec.Status
+                                            </span>
+                                        </td>
+                                        <td>@exec.StartedAt.ToString("MMM dd HH:mm:ss")</td>
+                                        <td>@FormatDuration(exec.Duration)</td>
+                                        <td>
+                                            <span class="step-progress">
+                                                @exec.CompletedSteps / @exec.TotalSteps
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="exec-actions">
+                                                <button class="admin-btn admin-btn-xs" @onclick="@(() => ViewExecutionDetails(exec))">
+                                                    Details
+                                                </button>
+                                                @if (exec.Status == "Running")
+                                                {
+                                                    <button class="admin-btn admin-btn-xs admin-btn-danger" @onclick="@(() => CancelExecution(exec))">
+                                                        Cancel
+                                                    </button>
+                                                }
+                                                @if (exec.Status == "Failed")
+                                                {
+                                                    <button class="admin-btn admin-btn-xs admin-btn-primary" @onclick="@(() => RetryExecution(exec))">
+                                                        Retry
+                                                    </button>
+                                                }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                break;
+
+            case "registry":
+                <div class="registry-view">
+                    <div class="registry-stats">
+                        <div class="stat">
+                            <div class="stat-label">Total Steps</div>
+                            <div class="stat-value">@StepRegistry.Count</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Categories</div>
+                            <div class="stat-value">@StepRegistry.Select(s => s.Category).Distinct().Count()</div>
+                        </div>
+                    </div>
+
+                    <div class="registry-categories">
+                        @foreach (var category in StepRegistry.GroupBy(s => s.Category))
+                        {
+                            <div class="registry-category">
+                                <div class="category-header" @onclick="@(() => ToggleCategory(category.Key))">
+                                    <span class="category-toggle">@(ExpandedCategories.Contains(category.Key) ? "▼" : "▶")</span>
+                                    <span class="category-name">@category.Key</span>
+                                    <span class="category-count">@category.Count() steps</span>
+                                </div>
+                                @if (ExpandedCategories.Contains(category.Key))
+                                {
+                                    <div class="category-steps">
+                                        @foreach (var step in category)
+                                        {
+                                            <div class="registry-step">
+                                                <div class="step-header">
+                                                    <code class="step-type-code">@step.TypeId</code>
+                                                    <span class="step-version">v@step.Version</span>
+                                                </div>
+                                                <div class="step-description">@step.Description</div>
+                                                <div class="step-contracts">
+                                                    <div class="contract-section">
+                                                        <span class="contract-label">Inputs:</span>
+                                                        @foreach (var input in step.Inputs)
+                                                        {
+                                                            <span class="contract-item @(input.Required ? "required" : "")">
+                                                                @input.Name
+                                                            </span>
+                                                        }
+                                                    </div>
+                                                    <div class="contract-section">
+                                                        <span class="contract-label">Outputs:</span>
+                                                        @foreach (var output in step.Outputs)
+                                                        {
+                                                            <span class="contract-item">@output</span>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+                break;
+
+            case "proposals":
+                <div class="proposals-view">
+                    <div class="proposals-header">
+                        <h3>LLM Pipeline Proposals</h3>
+                        <span class="proposals-subtitle">Review and approve pipeline changes proposed by AI</span>
+                    </div>
+
+                    @if (Proposals.Any())
+                    {
+                        <div class="proposals-list">
+                            @foreach (var proposal in Proposals)
+                            {
+                                <div class="proposal-card @(proposal.Status.ToLower())">
+                                    <div class="proposal-header">
+                                        <div class="proposal-title">
+                                            <span class="proposal-type">@proposal.ProposalType</span>
+                                            <span class="proposal-pipeline">@proposal.PipelineName</span>
+                                        </div>
+                                        <span class="proposal-status">@proposal.Status</span>
+                                    </div>
+                                    <div class="proposal-description">@proposal.Description</div>
+                                    <div class="proposal-changes">
+                                        <strong>Changes:</strong>
+                                        <ul>
+                                            @foreach (var change in proposal.Changes.Take(3))
+                                            {
+                                                <li>@change</li>
+                                            }
+                                            @if (proposal.Changes.Count > 3)
+                                            {
+                                                <li class="more-changes">+@(proposal.Changes.Count - 3) more changes...</li>
+                                            }
+                                        </ul>
+                                    </div>
+                                    <div class="proposal-meta">
+                                        <span>Proposed: @proposal.ProposedAt.ToString("MMM dd HH:mm")</span>
+                                        <span>By: @proposal.ProposedBy</span>
+                                    </div>
+                                    @if (proposal.Status == "Pending")
+                                    {
+                                        <div class="proposal-actions">
+                                            <button class="admin-btn admin-btn-primary" @onclick="@(() => ApproveProposal(proposal))">
+                                                Approve
+                                            </button>
+                                            <button class="admin-btn" @onclick="@(() => ViewProposalDiff(proposal))">
+                                                View Diff
+                                            </button>
+                                            <button class="admin-btn admin-btn-danger" @onclick="@(() => RejectProposal(proposal))">
+                                                Reject
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="no-proposals">
+                            <div class="no-proposals-icon">&#128230;</div>
+                            <div class="no-proposals-text">No pending proposals</div>
+                            <div class="no-proposals-hint">LLM-generated pipeline changes will appear here for review</div>
+                        </div>
+                    }
+                </div>
+                break;
+
+            case "metrics":
+                <div class="metrics-view">
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-title">Total Executions</div>
+                            <div class="metric-value">@Metrics.TotalExecutions</div>
+                            <div class="metric-trend positive">+@Metrics.ExecutionsToday today</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-title">Success Rate</div>
+                            <div class="metric-value">@Metrics.SuccessRate.ToString("P1")</div>
+                            <div class="metric-bar">
+                                <div class="metric-bar-fill" style="width: @(Metrics.SuccessRate * 100)%"></div>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-title">Avg Duration</div>
+                            <div class="metric-value">@FormatDuration(Metrics.AverageDuration)</div>
+                            <div class="metric-hint">P95: @FormatDuration(Metrics.P95Duration)</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-title">Active Pipelines</div>
+                            <div class="metric-value">@Metrics.ActivePipelines</div>
+                            <div class="metric-hint">@Metrics.TotalPipelines total</div>
+                        </div>
+                    </div>
+
+                    <div class="metrics-section">
+                        <h4>Step Execution Stats</h4>
+                        <div class="admin-table-wrap">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Step Type</th>
+                                        <th>Executions</th>
+                                        <th>Success Rate</th>
+                                        <th>Avg Duration</th>
+                                        <th>Failures</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var stat in Metrics.StepStats)
+                                    {
+                                        <tr>
+                                            <td><code>@stat.StepType</code></td>
+                                            <td>@stat.Executions</td>
+                                            <td>
+                                                <span class="@(stat.SuccessRate > 0.9 ? "text-success" : stat.SuccessRate > 0.7 ? "text-warning" : "text-error")">
+                                                    @stat.SuccessRate.ToString("P0")
+                                                </span>
+                                            </td>
+                                            <td>@stat.AvgDurationMs.ToString("F0")ms</td>
+                                            <td>@stat.Failures</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                break;
+        }
+    }
+
+    @if (ShowEditor)
+    {
+        <PipelineEditor
+            Pipeline="@EditingPipeline"
+            IsNew="@IsNewPipeline"
+            OnSave="HandlePipelineSave"
+            OnCancel="CloseEditor" />
+    }
+
+    @if (ShowDeleteConfirm && PipelineToDelete != null)
+    {
+        <div class="admin-modal-backdrop" @onclick="CancelDelete">
+            <div class="admin-modal delete-modal" @onclick:stopPropagation="true">
+                <div class="admin-modal-title">Delete Pipeline</div>
+                <div class="admin-modal-sub">@PipelineToDelete.Name</div>
+
+                <div class="delete-modal-content">
+                    @if (!string.IsNullOrEmpty(DeleteError))
+                    {
+                        <div class="delete-error">
+                            <span class="error-icon">&#9888;</span>
+                            @DeleteError
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="delete-warning">
+                            Are you sure you want to delete this pipeline? This action cannot be undone.
+                        </p>
+                        <div class="pipeline-delete-info">
+                            <div class="info-row">
+                                <span class="label">Name:</span>
+                                <span class="value">@PipelineToDelete.Name</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Steps:</span>
+                                <span class="value">@PipelineToDelete.StepCount steps</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Status:</span>
+                                <span class="value pipeline-status status-@PipelineToDelete.Status.ToLower()">@PipelineToDelete.Status</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="admin-modal-actions">
+                    <button class="admin-btn" @onclick="CancelDelete">Cancel</button>
+                    @if (string.IsNullOrEmpty(DeleteError) || !DeleteError.Contains("primary"))
+                    {
+                        <button class="admin-btn admin-btn-danger" @onclick="DeletePipeline">Delete Pipeline</button>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (ShowExecutionDetails && SelectedExecution != null)
+    {
+        <div class="admin-modal-backdrop" @onclick="CloseExecutionDetails">
+            <div class="admin-modal execution-modal" @onclick:stopPropagation="true">
+                <div class="admin-modal-title">Execution Details</div>
+                <div class="admin-modal-sub">@SelectedExecution.Id</div>
+
+                <div class="execution-details-content">
+                    <div class="exec-info-grid">
+                        <div class="exec-info-item">
+                            <span class="label">Pipeline</span>
+                            <span class="value">@SelectedExecution.PipelineName</span>
+                        </div>
+                        <div class="exec-info-item">
+                            <span class="label">Status</span>
+                            <span class="value exec-status-badge status-@SelectedExecution.Status.ToLower()">@SelectedExecution.Status</span>
+                        </div>
+                        <div class="exec-info-item">
+                            <span class="label">Started</span>
+                            <span class="value">@SelectedExecution.StartedAt.ToString("yyyy-MM-dd HH:mm:ss")</span>
+                        </div>
+                        <div class="exec-info-item">
+                            <span class="label">Duration</span>
+                            <span class="value">@FormatDuration(SelectedExecution.Duration)</span>
+                        </div>
+                    </div>
+
+                    <div class="step-results">
+                        <h4>Step Results</h4>
+                        @foreach (var step in SelectedExecution.StepResults)
+                        {
+                            <div class="step-result @step.Status.ToLower()">
+                                <div class="step-result-header">
+                                    <span class="step-name">@step.StepId</span>
+                                    <span class="step-status">@step.Status</span>
+                                    <span class="step-duration">@step.DurationMs ms</span>
+                                </div>
+                                @if (!string.IsNullOrEmpty(step.Error))
+                                {
+                                    <div class="step-error">@step.Error</div>
+                                }
+                                @if (step.Outputs?.Any() == true)
+                                {
+                                    <details class="step-outputs">
+                                        <summary>Outputs (@step.Outputs.Count)</summary>
+                                        <pre>@JsonSerializer.Serialize(step.Outputs, new JsonSerializerOptions { WriteIndented = true })</pre>
+                                    </details>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="admin-btn" @onclick="CloseExecutionDetails">Close</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (ShowKeywordEditor && EditingKeywordsPipeline != null)
+    {
+        <div class="admin-modal-backdrop" @onclick="CloseKeywordEditor">
+            <div class="admin-modal keyword-editor-modal" @onclick:stopPropagation="true">
+                <div class="admin-modal-title">Edit Keywords</div>
+                <div class="admin-modal-sub">@EditingKeywordsPipeline.Name</div>
+
+                <div class="keyword-editor-content">
+                    <p class="keyword-help">Add keywords that will trigger this pipeline. When a user message contains any of these keywords, this pipeline will be used instead of the primary.</p>
+
+                    <div class="keyword-input-row">
+                        <input type="text" @bind="NewKeyword" @bind:event="oninput"
+                               @onkeydown="HandleKeywordKeyDown"
+                               placeholder="Type a keyword and press Enter"
+                               class="keyword-input" />
+                        <button class="admin-btn admin-btn-primary admin-btn-sm" @onclick="AddKeyword">Add</button>
+                    </div>
+
+                    <div class="keyword-tags-container">
+                        @if (EditingKeywords.Any())
+                        {
+                            @foreach (var keyword in EditingKeywords)
+                            {
+                                <div class="keyword-tag-editable">
+                                    <span>@keyword</span>
+                                    <button class="keyword-remove" @onclick="@(() => RemoveKeyword(keyword))">×</button>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="no-keywords-hint">No keywords added yet</div>
+                        }
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="admin-btn" @onclick="CloseKeywordEditor">Cancel</button>
+                    <button class="admin-btn admin-btn-primary" @onclick="SaveKeywords">Save Keywords</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (ShowWorkspace)
+    {
+        <div class="workspace-panel">
+            <div class="workspace-header">
+                <div class="workspace-title">
+                    <span class="workspace-icon-large">&#128194;</span>
+                    <h3>Workspace Preview</h3>
+                </div>
+                <button class="workspace-close" @onclick="CloseWorkspace" title="Close Workspace">
+                    &#10005;
+                </button>
+            </div>
+            <div class="workspace-content">
+                <div class="workspace-files">
+                    <div class="workspace-section-title">Generated Files</div>
+                    <div class="workspace-file-list">
+                        @if (WorkspaceFiles.Any())
+                        {
+                            @foreach (var file in WorkspaceFiles)
+                            {
+                                <div class="workspace-file @(SelectedWorkspaceFile == file.Path ? "selected" : "")"
+                                     @onclick="@(() => SelectWorkspaceFile(file))">
+                                    <span class="file-icon">@GetFileIcon(file.Path)</span>
+                                    <span class="file-name">@file.Path</span>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="workspace-empty">
+                                <div class="empty-icon">&#128196;</div>
+                                <div class="empty-text">No files generated yet</div>
+                                <div class="empty-hint">Use the chat to create files</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="workspace-preview">
+                    <div class="workspace-section-title">
+                        @if (!string.IsNullOrEmpty(SelectedWorkspaceFile))
+                        {
+                            <span>@SelectedWorkspaceFile</span>
+                        }
+                        else
+                        {
+                            <span>File Preview</span>
+                        }
+                    </div>
+                    <div class="workspace-preview-content">
+                        @if (!string.IsNullOrEmpty(SelectedWorkspaceFileContent))
+                        {
+                            <pre><code>@SelectedWorkspaceFileContent</code></pre>
+                        }
+                        else
+                        {
+                            <div class="preview-empty">
+                                <div class="empty-icon">&#128065;</div>
+                                <div class="empty-text">Select a file to preview</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .pipelines-admin {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+
+    .pipelines-header {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .pipelines-title-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .pipelines-title-row h2 {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    .pipelines-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .pipelines-tabs {
+        display: flex;
+        gap: 0.25rem;
+        border-bottom: 1px solid var(--border-default);
+        padding-bottom: 0.5rem;
+    }
+
+    .tab-btn {
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 8px 8px 0 0;
+        background: transparent;
+        color: var(--text-secondary);
+        font-weight: 600;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .tab-btn:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+    .tab-btn.active {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+        color: var(--primary-500);
+        border-bottom: 2px solid var(--primary-500);
+    }
+
+    .pipelines-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        padding: 3rem;
+        color: var(--text-secondary);
+    }
+
+    .loading-spinner {
+        width: 24px;
+        height: 24px;
+        border: 3px solid var(--border-default);
+        border-top-color: var(--primary-500);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Pipeline List View */
+    .pipelines-filters {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .search-input {
+        flex: 1;
+        padding: 0.625rem 1rem;
+        border: 1px solid var(--border-default);
+        border-radius: 10px;
+        background: var(--input-bg);
+        color: var(--text-primary);
+        font-size: 0.875rem;
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: var(--primary-500);
+    }
+
+    .filter-select {
+        padding: 0.625rem 1rem;
+        border: 1px solid var(--border-default);
+        border-radius: 10px;
+        background: var(--input-bg);
+        color: var(--text-primary);
+        font-size: 0.875rem;
+    }
+
+    .pipelines-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1rem;
+    }
+
+    .pipeline-card {
+        padding: 1rem;
+        border: 1px solid var(--border-default);
+        border-radius: 14px;
+        background: var(--card-bg);
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .pipeline-card:hover {
+        border-color: var(--primary-500);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+    }
+
+    .pipeline-card.selected {
+        border-color: var(--primary-500);
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
+    }
+
+    .pipeline-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .pipeline-name {
+        font-weight: 700;
+        color: var(--text-primary);
+        font-size: 1rem;
+    }
+
+    .pipeline-status {
+        padding: 0.25rem 0.5rem;
+        border-radius: 6px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .status-active { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+    .status-draft { background: rgba(234, 179, 8, 0.15); color: #eab308; }
+    .status-archived { background: rgba(107, 114, 128, 0.15); color: #6b7280; }
+    .status-running { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+    .status-completed { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+    .status-failed { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .status-cancelled { background: rgba(107, 114, 128, 0.15); color: #6b7280; }
+    .status-pending { background: rgba(234, 179, 8, 0.15); color: #eab308; }
+    .status-approved { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+    .status-rejected { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+    .pipeline-card-meta {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 0.5rem;
+        font-size: 0.75rem;
+        color: var(--text-tertiary);
+    }
+
+    .pipeline-card-desc {
+        margin-top: 0.75rem;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        line-height: 1.4;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .pipeline-card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 0.75rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--border-default);
+    }
+
+    .pipeline-updated {
+        font-size: 0.7rem;
+        color: var(--text-tertiary);
+    }
+
+    .pipeline-card-actions {
+        display: flex;
+        gap: 0.25rem;
+    }
+
+    .icon-btn {
+        padding: 0.375rem;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .icon-btn:hover {
+        background: var(--bg-hover);
+        color: var(--primary-500);
+    }
+
+    .icon-btn-danger:hover {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+    }
+
+    .icon {
+        font-size: 0.875rem;
+    }
+
+    /* Pipeline Details Panel */
+    .pipeline-details {
+        margin-top: 1rem;
+        padding: 1rem;
+        border: 1px solid var(--border-default);
+        border-radius: 14px;
+        background: var(--card-bg);
+    }
+
+    .details-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .details-header h3 {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    .details-section {
+        margin-bottom: 1rem;
+    }
+
+    .details-section h4 {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: var(--text-secondary);
+        margin: 0 0 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.75rem;
+    }
+
+    .info-item {
+        padding: 0.5rem;
+        background: var(--bg-secondary);
+        border-radius: 8px;
+    }
+
+    .info-label {
+        display: block;
+        font-size: 0.7rem;
+        color: var(--text-tertiary);
+        margin-bottom: 0.25rem;
+    }
+
+    .info-value {
+        font-size: 0.85rem;
+        color: var(--text-primary);
+        font-weight: 600;
+    }
+
+    /* Steps Flow */
+    .steps-flow {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .step-node {
+        width: 100%;
+        max-width: 300px;
+        padding: 0.75rem;
+        border: 1px solid var(--border-default);
+        border-radius: 10px;
+        background: var(--bg-elevated);
+    }
+
+    .step-type {
+        font-size: 0.7rem;
+        color: var(--primary-500);
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .step-id {
+        font-size: 0.85rem;
+        color: var(--text-primary);
+        font-weight: 600;
+    }
+
+    .step-deps {
+        font-size: 0.7rem;
+        color: var(--text-tertiary);
+        margin-top: 0.25rem;
+    }
+
+    .step-connector {
+        color: var(--text-tertiary);
+    }
+
+    .connector-arrow {
+        font-size: 1.25rem;
+    }
+
+    /* Executions Mini List */
+    .executions-mini-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.375rem;
+    }
+
+    .execution-mini-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        font-size: 0.75rem;
+    }
+
+    .exec-status {
+        padding: 0.125rem 0.375rem;
+        border-radius: 4px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .exec-id {
+        font-family: var(--font-mono);
+        color: var(--text-secondary);
+    }
+
+    .exec-duration {
+        color: var(--text-primary);
+        font-weight: 600;
+    }
+
+    .exec-time {
+        color: var(--text-tertiary);
+        margin-left: auto;
+    }
+
+    .no-executions {
+        color: var(--text-tertiary);
+        font-size: 0.8rem;
+        padding: 0.5rem;
+    }
+
+    /* Executions View */
+    .exec-id-code {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+        background: var(--bg-secondary);
+        border-radius: 4px;
+    }
+
+    .exec-status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 6px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .step-progress {
+        font-weight: 600;
+    }
+
+    .exec-actions {
+        display: flex;
+        gap: 0.25rem;
+    }
+
+    .row-running {
+        animation: pulse-bg 2s ease-in-out infinite;
+    }
+
+    @@keyframes pulse-bg {
+        0%, 100% { background: transparent; }
+        50% { background: rgba(59, 130, 246, 0.05); }
+    }
+
+    /* Registry View */
+    .registry-stats {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .registry-categories {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .registry-category {
+        border: 1px solid var(--border-default);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .category-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        background: var(--bg-secondary);
+        cursor: pointer;
+        transition: background 0.15s ease;
+    }
+
+    .category-header:hover {
+        background: var(--bg-hover);
+    }
+
+    .category-toggle {
+        color: var(--text-tertiary);
+        font-size: 0.75rem;
+    }
+
+    .category-name {
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .category-count {
+        margin-left: auto;
+        font-size: 0.75rem;
+        color: var(--text-tertiary);
+    }
+
+    .category-steps {
+        padding: 0.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .registry-step {
+        padding: 0.75rem;
+        border: 1px solid var(--border-default);
+        border-radius: 10px;
+        background: var(--card-bg);
+    }
+
+    .step-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .step-type-code {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        padding: 0.25rem 0.5rem;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+        border-radius: 6px;
+        color: var(--primary-500);
+    }
+
+    .step-version {
+        font-size: 0.7rem;
+        color: var(--text-tertiary);
+    }
+
+    .step-description {
+        margin-top: 0.5rem;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+    }
+
+    .step-contracts {
+        margin-top: 0.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .contract-section {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        flex-wrap: wrap;
+    }
+
+    .contract-label {
+        font-size: 0.7rem;
+        color: var(--text-tertiary);
+        font-weight: 600;
+    }
+
+    .contract-item {
+        font-size: 0.7rem;
+        padding: 0.125rem 0.375rem;
+        background: var(--bg-secondary);
+        border-radius: 4px;
+        color: var(--text-secondary);
+    }
+
+    .contract-item.required {
+        background: rgba(234, 179, 8, 0.15);
+        color: #eab308;
+    }
+
+    /* Proposals View */
+    .proposals-header {
+        margin-bottom: 1rem;
+    }
+
+    .proposals-header h3 {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    .proposals-subtitle {
+        font-size: 0.8rem;
+        color: var(--text-tertiary);
+    }
+
+    .proposals-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .proposal-card {
+        padding: 1rem;
+        border: 1px solid var(--border-default);
+        border-radius: 14px;
+        background: var(--card-bg);
+    }
+
+    .proposal-card.pending {
+        border-left: 3px solid #eab308;
+    }
+
+    .proposal-card.approved {
+        border-left: 3px solid #22c55e;
+    }
+
+    .proposal-card.rejected {
+        border-left: 3px solid #ef4444;
+    }
+
+    .proposal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .proposal-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .proposal-type {
+        font-size: 0.7rem;
+        padding: 0.25rem 0.5rem;
+        background: var(--bg-secondary);
+        border-radius: 4px;
+        color: var(--text-tertiary);
+        text-transform: uppercase;
+        font-weight: 700;
+    }
+
+    .proposal-pipeline {
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .proposal-status {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--text-secondary);
+    }
+
+    .proposal-description {
+        margin-top: 0.5rem;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+
+    .proposal-changes {
+        margin-top: 0.75rem;
+        padding: 0.75rem;
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        font-size: 0.8rem;
+    }
+
+    .proposal-changes ul {
+        margin: 0.25rem 0 0 1rem;
+        padding: 0;
+    }
+
+    .proposal-changes li {
+        color: var(--text-secondary);
+        margin: 0.25rem 0;
+    }
+
+    .more-changes {
+        color: var(--text-tertiary);
+        font-style: italic;
+    }
+
+    .proposal-meta {
+        display: flex;
+        gap: 1rem;
+        margin-top: 0.75rem;
+        font-size: 0.75rem;
+        color: var(--text-tertiary);
+    }
+
+    .proposal-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--border-default);
+    }
+
+    .no-proposals {
+        text-align: center;
+        padding: 3rem;
+    }
+
+    .no-proposals-icon {
+        font-size: 3rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .no-proposals-text {
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .no-proposals-hint {
+        font-size: 0.8rem;
+        color: var(--text-tertiary);
+        margin-top: 0.25rem;
+    }
+
+    /* Metrics View */
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .metric-card {
+        padding: 1rem;
+        border: 1px solid var(--border-default);
+        border-radius: 14px;
+        background: var(--card-bg);
+    }
+
+    .metric-title {
+        font-size: 0.75rem;
+        color: var(--text-tertiary);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .metric-value {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        margin-top: 0.25rem;
+    }
+
+    .metric-trend {
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+    }
+
+    .metric-trend.positive {
+        color: #22c55e;
+    }
+
+    .metric-trend.negative {
+        color: #ef4444;
+    }
+
+    .metric-bar {
+        height: 6px;
+        background: var(--bg-secondary);
+        border-radius: 3px;
+        margin-top: 0.5rem;
+        overflow: hidden;
+    }
+
+    .metric-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary-500), var(--accent-purple));
+        border-radius: 3px;
+        transition: width 0.3s ease;
+    }
+
+    .metric-hint {
+        font-size: 0.75rem;
+        color: var(--text-tertiary);
+        margin-top: 0.25rem;
+    }
+
+    .metrics-section {
+        margin-top: 1rem;
+    }
+
+    .metrics-section h4 {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0 0 0.75rem;
+    }
+
+    .text-success { color: #22c55e; }
+    .text-warning { color: #eab308; }
+    .text-error { color: #ef4444; }
+
+    /* Execution Details Modal */
+    .execution-modal {
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .execution-details-content {
+        margin-top: 1rem;
+    }
+
+    .exec-info-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .exec-info-item {
+        padding: 0.75rem;
+        background: var(--bg-secondary);
+        border-radius: 10px;
+    }
+
+    .exec-info-item .label {
+        display: block;
+        font-size: 0.7rem;
+        color: var(--text-tertiary);
+        margin-bottom: 0.25rem;
+    }
+
+    .exec-info-item .value {
+        font-size: 0.85rem;
+        color: var(--text-primary);
+        font-weight: 600;
+    }
+
+    .step-results {
+        margin-top: 1rem;
+    }
+
+    .step-results h4 {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0 0 0.75rem;
+    }
+
+    .step-result {
+        margin-bottom: 0.5rem;
+        padding: 0.75rem;
+        border: 1px solid var(--border-default);
+        border-radius: 10px;
+        background: var(--card-bg);
+    }
+
+    .step-result.completed {
+        border-left: 3px solid #22c55e;
+    }
+
+    .step-result.failed {
+        border-left: 3px solid #ef4444;
+    }
+
+    .step-result.running {
+        border-left: 3px solid #3b82f6;
+    }
+
+    .step-result.skipped {
+        border-left: 3px solid #6b7280;
+    }
+
+    .step-result-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .step-result .step-name {
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .step-result .step-status {
+        font-size: 0.7rem;
+        padding: 0.125rem 0.375rem;
+        border-radius: 4px;
+        background: var(--bg-secondary);
+        color: var(--text-secondary);
+    }
+
+    .step-result .step-duration {
+        margin-left: auto;
+        font-size: 0.75rem;
+        color: var(--text-tertiary);
+    }
+
+    .step-error {
+        margin-top: 0.5rem;
+        padding: 0.5rem;
+        background: rgba(239, 68, 68, 0.1);
+        border-radius: 6px;
+        font-size: 0.8rem;
+        color: #ef4444;
+        font-family: var(--font-mono);
+    }
+
+    .step-outputs {
+        margin-top: 0.5rem;
+    }
+
+    .step-outputs summary {
+        font-size: 0.75rem;
+        color: var(--text-tertiary);
+        cursor: pointer;
+    }
+
+    .step-outputs pre {
+        margin: 0.5rem 0 0;
+        padding: 0.5rem;
+        background: var(--bg-secondary);
+        border-radius: 6px;
+        font-size: 0.75rem;
+        overflow-x: auto;
+    }
+
+    .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border-default);
+    }
+
+    @@media (max-width: 900px) {
+        .metrics-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .info-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .exec-info-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    /* Workspace Button */
+    .admin-btn-workspace {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        color: var(--accent-purple, #8b5cf6);
+    }
+
+    .admin-btn-workspace:hover {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%);
+        border-color: var(--accent-purple, #8b5cf6);
+    }
+
+    .workspace-icon {
+        font-size: 1rem;
+    }
+
+    /* Workspace Panel */
+    .workspace-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 50%;
+        max-width: 800px;
+        height: 100vh;
+        background: var(--bg-primary, #1a1a2e);
+        border-left: 1px solid var(--border-default, #2a2a4a);
+        box-shadow: -8px 0 32px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        animation: slideInRight 0.25s ease-out;
+    }
+
+    @@keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    .workspace-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid var(--border-default, #2a2a4a);
+        background: var(--bg-secondary, #16162a);
+    }
+
+    .workspace-title {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .workspace-icon-large {
+        font-size: 1.5rem;
+    }
+
+    .workspace-title h3 {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text-primary, #fff);
+    }
+
+    .workspace-close {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text-tertiary, #888);
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .workspace-close:hover {
+        background: var(--bg-hover, rgba(255,255,255,0.1));
+        color: var(--text-primary, #fff);
+    }
+
+    .workspace-content {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+    }
+
+    .workspace-files {
+        width: 220px;
+        border-right: 1px solid var(--border-default, #2a2a4a);
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-secondary, #16162a);
+    }
+
+    .workspace-section-title {
+        padding: 0.75rem 1rem;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-tertiary, #888);
+        border-bottom: 1px solid var(--border-default, #2a2a4a);
+    }
+
+    .workspace-file-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.5rem;
+    }
+
+    .workspace-file {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .workspace-file:hover {
+        background: var(--bg-hover, rgba(255,255,255,0.05));
+    }
+
+    .workspace-file.selected {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .file-icon {
+        font-size: 1rem;
+    }
+
+    .file-name {
+        font-size: 0.8rem;
+        color: var(--text-primary, #fff);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .workspace-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 1rem;
+        text-align: center;
+    }
+
+    .empty-icon {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        opacity: 0.5;
+    }
+
+    .empty-text {
+        font-size: 0.85rem;
+        color: var(--text-secondary, #aaa);
+        font-weight: 600;
+    }
+
+    .empty-hint {
+        font-size: 0.75rem;
+        color: var(--text-tertiary, #888);
+        margin-top: 0.25rem;
+    }
+
+    .workspace-preview {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .workspace-preview-content {
+        flex: 1;
+        overflow: auto;
+        padding: 1rem;
+        background: var(--bg-primary, #1a1a2e);
+    }
+
+    .workspace-preview-content pre {
+        margin: 0;
+        padding: 1rem;
+        background: var(--bg-secondary, #16162a);
+        border-radius: 10px;
+        overflow-x: auto;
+    }
+
+    .workspace-preview-content code {
+        font-family: var(--font-mono, 'Fira Code', monospace);
+        font-size: 0.8rem;
+        line-height: 1.5;
+        color: var(--text-primary, #fff);
+    }
+
+    .preview-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        text-align: center;
+    }
+
+    /* Primary Pipeline Indicator */
+    .pipeline-card.is-primary {
+        border: 2px solid #22c55e;
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, rgba(34, 197, 94, 0.02) 100%);
+    }
+
+    .pipeline-name-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .primary-badge {
+        padding: 0.125rem 0.375rem;
+        border-radius: 4px;
+        font-size: 0.6rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        background: #22c55e;
+        color: #fff;
+    }
+
+    .primary-btn {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid var(--border-default, #2a2a4a);
+        border-radius: 50%;
+        background: transparent;
+        color: var(--text-tertiary, #888);
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .primary-btn:hover {
+        border-color: #22c55e;
+        color: #22c55e;
+    }
+
+    .primary-btn.is-active {
+        border-color: #22c55e;
+        background: #22c55e;
+        color: #fff;
+        box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
+    }
+
+    .primary-icon {
+        font-size: 0.75rem;
+    }
+
+    /* Keywords Section */
+    .pipeline-keywords {
+        margin-top: 0.75rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--border-default, #2a2a4a);
+    }
+
+    .keywords-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.375rem;
+    }
+
+    .keywords-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: var(--text-tertiary, #888);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .keyword-add-btn {
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px dashed var(--border-default, #2a2a4a);
+        border-radius: 4px;
+        background: transparent;
+        color: var(--text-tertiary, #888);
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .keyword-add-btn:hover {
+        border-color: var(--primary-500, #3b82f6);
+        color: var(--primary-500, #3b82f6);
+        background: rgba(59, 130, 246, 0.1);
+    }
+
+    .keywords-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+
+    .keyword-tag {
+        padding: 0.125rem 0.375rem;
+        border-radius: 4px;
+        font-size: 0.65rem;
+        font-weight: 600;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+        color: var(--primary-500, #3b82f6);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+
+    .keyword-more {
+        font-size: 0.65rem;
+        color: var(--text-tertiary, #888);
+        font-style: italic;
+    }
+
+    .no-keywords {
+        font-size: 0.7rem;
+        color: var(--text-tertiary, #888);
+        font-style: italic;
+    }
+
+    /* Keyword Editor Modal */
+    .keyword-editor-modal {
+        width: 100%;
+        max-width: 500px;
+    }
+
+    .keyword-editor-content {
+        padding: 1rem 0;
+    }
+
+    .keyword-help {
+        font-size: 0.8rem;
+        color: var(--text-secondary, #aaa);
+        margin: 0 0 1rem;
+        line-height: 1.5;
+    }
+
+    .keyword-input-row {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .keyword-input {
+        flex: 1;
+        padding: 0.625rem 1rem;
+        border: 1px solid var(--border-default, #2a2a4a);
+        border-radius: 10px;
+        background: var(--input-bg, #16162a);
+        color: var(--text-primary, #fff);
+        font-size: 0.875rem;
+    }
+
+    .keyword-input:focus {
+        outline: none;
+        border-color: var(--primary-500, #3b82f6);
+    }
+
+    .admin-btn-sm {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+    }
+
+    .admin-btn-danger {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: white;
+        border: none;
+    }
+
+    .admin-btn-danger:hover {
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        transform: translateY(-1px);
+    }
+
+    /* Delete Modal Styles */
+    .delete-modal {
+        max-width: 450px;
+    }
+
+    .delete-modal-content {
+        padding: 1.5rem 0;
+    }
+
+    .delete-warning {
+        color: var(--text-secondary);
+        margin-bottom: 1rem;
+        line-height: 1.5;
+    }
+
+    .delete-error {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 8px;
+        color: #ef4444;
+    }
+
+    .delete-error .error-icon {
+        font-size: 1.25rem;
+    }
+
+    .pipeline-delete-info {
+        background: var(--bg-secondary, #16162a);
+        border-radius: 8px;
+        padding: 1rem;
+        border: 1px solid var(--border-default, #2a2a4a);
+    }
+
+    .pipeline-delete-info .info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+    }
+
+    .pipeline-delete-info .info-row:not(:last-child) {
+        border-bottom: 1px solid var(--border-default, #2a2a4a);
+    }
+
+    .pipeline-delete-info .label {
+        color: var(--text-secondary);
+    }
+
+    .pipeline-delete-info .value {
+        font-weight: 500;
+    }
+
+    .keyword-tags-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        min-height: 60px;
+        padding: 0.75rem;
+        background: var(--bg-secondary, #16162a);
+        border-radius: 10px;
+        border: 1px solid var(--border-default, #2a2a4a);
+    }
+
+    .keyword-tag-editable {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.375rem 0.5rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+        color: var(--primary-500, #3b82f6);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .keyword-remove {
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        border-radius: 50%;
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .keyword-remove:hover {
+        background: #ef4444;
+        color: #fff;
+    }
+
+    .no-keywords-hint {
+        color: var(--text-tertiary, #888);
+        font-size: 0.8rem;
+        font-style: italic;
+        width: 100%;
+        text-align: center;
+        padding: 0.5rem;
+    }
+</style>
+
+@code {
+    private string ActiveTab = "list";
+    private bool IsLoading = true;
+    private string SearchQuery = "";
+    private string StatusFilter = "";
+
+    private List<PipelineViewModel> Pipelines = new();
+    private PipelineViewModel? SelectedPipeline = null;
+    private List<ExecutionViewModel> SelectedPipelineExecutions = new();
+    private List<ExecutionViewModel> Executions = new();
+    private List<StepRegistryItem> StepRegistry = new();
+    private HashSet<string> ExpandedCategories = new();
+    private List<ProposalViewModel> Proposals = new();
+    private MetricsViewModel Metrics = new();
+
+    private bool ShowEditor = false;
+    private PipelineViewModel? EditingPipeline = null;
+    private bool IsNewPipeline = false;
+
+    private bool ShowExecutionDetails = false;
+    private ExecutionViewModel? SelectedExecution = null;
+
+    // Delete confirmation state
+    private bool ShowDeleteConfirm = false;
+    private PipelineViewModel? PipelineToDelete = null;
+    private string DeleteError = "";
+
+    private IEnumerable<PipelineViewModel> FilteredPipelines => Pipelines
+        .Where(p => string.IsNullOrEmpty(SearchQuery) ||
+                    p.Name.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase) ||
+                    p.Description.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase))
+        .Where(p => string.IsNullOrEmpty(StatusFilter) || p.Status.Equals(StatusFilter, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private string? ActivePipelineId = null;
+    private string? PrimaryPipelineId = null;
+    private bool ShowWorkspace = false;
+
+    // Keyword editor state
+    private bool ShowKeywordEditor = false;
+    private PipelineViewModel? EditingKeywordsPipeline = null;
+    private List<string> EditingKeywords = new();
+    private string NewKeyword = "";
+
+    private async Task LoadData()
+    {
+        IsLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Load pipelines from API
+            var pipelinesResponse = await Http.GetFromJsonAsync<PipelinesApiResponse>("api/pipelines");
+            if (pipelinesResponse != null)
+            {
+                ActivePipelineId = pipelinesResponse.ActivePipelineId;
+                PrimaryPipelineId = pipelinesResponse.PrimaryPipelineId;
+                Pipelines = pipelinesResponse.Pipelines.Select(p => new PipelineViewModel
+                {
+                    Id = p.Id ?? "",
+                    Name = p.Name,
+                    Description = p.Description,
+                    Version = p.Version,
+                    Status = p.Status,
+                    StepCount = p.StepCount,
+                    CreatedAt = p.CreatedAt,
+                    UpdatedAt = p.UpdatedAt,
+                    Keywords = p.Config?.TriggerKeywords ?? new(),
+                    Config = p.Config != null ? new PipelineConfigViewModel
+                    {
+                        TriggerKeywords = p.Config.TriggerKeywords ?? new(),
+                        IncludedPrompts = p.Config.IncludedPrompts ?? new(),
+                        EnabledTools = p.Config.EnabledTools ?? new(),
+                        InjectConversation = p.Config.InjectConversation,
+                        MaxContextTokens = p.Config.MaxContextTokens,
+                        MaxToolIterations = p.Config.MaxToolIterations,
+                        Temperature = p.Config.Temperature,
+                        MaxOutputTokens = p.Config.MaxOutputTokens,
+                        EnablePlanning = p.Config.EnablePlanning,
+                        EnableValidation = p.Config.EnableValidation,
+                        PromptOverrides = p.Config.PromptOverrides != null ? new PromptOverridesViewModel
+                        {
+                            SystemPrompt = p.Config.PromptOverrides.SystemPrompt,
+                            DeveloperPrompt = p.Config.PromptOverrides.DeveloperPrompt,
+                            ToolsPrompt = p.Config.PromptOverrides.ToolsPrompt,
+                            PlanningPrompt = p.Config.PromptOverrides.PlanningPrompt,
+                            ValidationPrompt = p.Config.PromptOverrides.ValidationPrompt
+                        } : null
+                    } : null,
+                    Steps = p.Steps?.Select(s => new StepViewModel
+                    {
+                        Id = s.Id,
+                        Type = s.Type,
+                        DependsOn = s.DependsOn
+                    }).ToList() ?? new()
+                }).ToList();
+            }
+
+            // Load step registry from API
+            var registryItems = await Http.GetFromJsonAsync<List<StepRegistryApiItem>>("api/pipelines/registry/steps");
+            if (registryItems != null)
+            {
+                StepRegistry = registryItems.Select(r => new StepRegistryItem
+                {
+                    TypeId = r.TypeId,
+                    Category = r.Category,
+                    Description = r.Description,
+                    Version = r.Version,
+                    Inputs = r.Inputs.Select(i => new StepInput(i.Name, i.Required)).ToList(),
+                    Outputs = r.Outputs
+                }).ToList();
+            }
+
+            // Keep sample data for executions, proposals, metrics (these need their own API)
+            Executions = GenerateSampleExecutions();
+            Proposals = GenerateSampleProposals();
+            Metrics = GenerateSampleMetrics();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading pipelines: {ex.Message}");
+            // Fallback to sample data on error
+            Pipelines = GenerateSamplePipelines();
+            StepRegistry = GenerateSampleRegistry();
+            Executions = GenerateSampleExecutions();
+            Proposals = GenerateSampleProposals();
+            Metrics = GenerateSampleMetrics();
+        }
+
+        IsLoading = false;
+        StateHasChanged();
+    }
+
+    private void OpenWorkspace()
+    {
+        ShowWorkspace = true;
+    }
+
+    private void CloseWorkspace()
+    {
+        ShowWorkspace = false;
+    }
+
+    // Workspace state
+    private List<WorkspaceFile> WorkspaceFiles = new();
+    private string? SelectedWorkspaceFile = null;
+    private string? SelectedWorkspaceFileContent = null;
+
+    private void SelectWorkspaceFile(WorkspaceFile file)
+    {
+        SelectedWorkspaceFile = file.Path;
+        SelectedWorkspaceFileContent = file.Content;
+    }
+
+    private string GetFileIcon(string path)
+    {
+        var ext = System.IO.Path.GetExtension(path).ToLower();
+        return ext switch
+        {
+            ".js" or ".jsx" => "&#128313;", // Yellow square for JS
+            ".ts" or ".tsx" => "&#128309;", // Blue circle for TS
+            ".cs" => "&#128994;", // Green circle for C#
+            ".html" => "&#128992;", // Orange circle for HTML
+            ".css" or ".scss" => "&#128995;", // Purple for CSS
+            ".json" => "&#128997;", // Red for JSON
+            ".md" => "&#128214;", // Book for MD
+            _ => "&#128196;" // Default document icon
+        };
+    }
+
+    public class WorkspaceFile
+    {
+        public string Path { get; set; } = "";
+        public string Content { get; set; } = "";
+        public string Language { get; set; } = "";
+    }
+
+    // Set as Primary Pipeline
+    private async Task SetAsPrimary(PipelineViewModel pipeline)
+    {
+        try
+        {
+            var response = await Http.PostAsync($"api/pipelines/primary/{pipeline.Id}", null);
+            if (response.IsSuccessStatusCode)
+            {
+                PrimaryPipelineId = pipeline.Id;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error setting primary pipeline: {ex.Message}");
+        }
+    }
+
+    // Keyword Editor Methods
+    private void OpenKeywordEditor(PipelineViewModel pipeline)
+    {
+        EditingKeywordsPipeline = pipeline;
+        EditingKeywords = pipeline.Keywords?.ToList() ?? new List<string>();
+        NewKeyword = "";
+        ShowKeywordEditor = true;
+    }
+
+    private void CloseKeywordEditor()
+    {
+        ShowKeywordEditor = false;
+        EditingKeywordsPipeline = null;
+        EditingKeywords = new();
+        NewKeyword = "";
+    }
+
+    private void AddKeyword()
+    {
+        if (!string.IsNullOrWhiteSpace(NewKeyword) && !EditingKeywords.Contains(NewKeyword.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            EditingKeywords.Add(NewKeyword.Trim());
+            NewKeyword = "";
+        }
+    }
+
+    private void RemoveKeyword(string keyword)
+    {
+        EditingKeywords.Remove(keyword);
+    }
+
+    private void HandleKeywordKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            AddKeyword();
+        }
+    }
+
+    private async Task SaveKeywords()
+    {
+        if (EditingKeywordsPipeline == null) return;
+
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/pipelines/{EditingKeywordsPipeline.Id}/keywords", EditingKeywords);
+            if (response.IsSuccessStatusCode)
+            {
+                // Update local state
+                var pipeline = Pipelines.FirstOrDefault(p => p.Id == EditingKeywordsPipeline.Id);
+                if (pipeline != null)
+                {
+                    pipeline.Keywords = EditingKeywords.ToList();
+                }
+                CloseKeywordEditor();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving keywords: {ex.Message}");
+        }
+    }
+
+    // API Response DTOs
+    public class PipelinesApiResponse
+    {
+        public List<PipelineApiDto> Pipelines { get; set; } = new();
+        public string ActivePipelineId { get; set; } = "";
+        public string PrimaryPipelineId { get; set; } = "";
+    }
+
+    public class PipelineApiDto
+    {
+        public string? Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Version { get; set; } = "";
+        public string Status { get; set; } = "";
+        public int StepCount { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+        public List<StepApiDto>? Steps { get; set; }
+        public PipelineConfigApiDto? Config { get; set; }
+    }
+
+    public class PipelineConfigApiDto
+    {
+        public List<string>? TriggerKeywords { get; set; }
+        public List<string>? IncludedPrompts { get; set; }
+        public List<string>? EnabledTools { get; set; }
+        public bool InjectConversation { get; set; } = true;
+        public int MaxContextTokens { get; set; } = 4096;
+        public int MaxToolIterations { get; set; } = 10;
+        public float Temperature { get; set; } = 0.7f;
+        public int MaxOutputTokens { get; set; } = 2048;
+        public bool EnablePlanning { get; set; } = true;
+        public bool EnableValidation { get; set; } = true;
+        public PromptOverridesApiDto? PromptOverrides { get; set; }
+    }
+
+    public class PromptOverridesApiDto
+    {
+        public string? SystemPrompt { get; set; }
+        public string? DeveloperPrompt { get; set; }
+        public string? ToolsPrompt { get; set; }
+        public string? PlanningPrompt { get; set; }
+        public string? ValidationPrompt { get; set; }
+    }
+
+    public class StepApiDto
+    {
+        public string Id { get; set; } = "";
+        public string Type { get; set; } = "";
+        public List<string>? DependsOn { get; set; }
+    }
+
+    public class StepRegistryApiItem
+    {
+        public string TypeId { get; set; } = "";
+        public string Category { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Version { get; set; } = "";
+        public List<StepInputApiDto> Inputs { get; set; } = new();
+        public List<string> Outputs { get; set; } = new();
+    }
+
+    public class StepInputApiDto
+    {
+        public string Name { get; set; } = "";
+        public bool Required { get; set; }
+    }
+
+    private async Task RefreshPipelines()
+    {
+        await LoadData();
+    }
+
+    private void SelectPipeline(PipelineViewModel pipeline)
+    {
+        SelectedPipeline = pipeline;
+        SelectedPipelineExecutions = Executions
+            .Where(e => e.PipelineName == pipeline.Name)
+            .OrderByDescending(e => e.StartedAt)
+            .Take(10)
+            .ToList();
+    }
+
+    private void CreateNewPipeline()
+    {
+        EditingPipeline = new PipelineViewModel
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = "New Pipeline",
+            Description = "",
+            Version = "1.0.0",
+            Status = "Draft",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            Steps = new(),
+            Config = CreateDefaultConfig()
+        };
+        IsNewPipeline = true;
+        ShowEditor = true;
+    }
+
+    private void EditPipeline(PipelineViewModel pipeline)
+    {
+        EditingPipeline = pipeline;
+        IsNewPipeline = false;
+        ShowEditor = true;
+    }
+
+    private async Task RunPipeline(PipelineViewModel pipeline)
+    {
+        // ╔══════════════════════════════════════════════════════════════════════════════╗
+        // ║                              NEEDS ATTENTION                                  ║
+        // ╠══════════════════════════════════════════════════════════════════════════════╣
+        // ║ ISSUE: Method is not implemented - pipeline execution does nothing           ║
+        // ║                                                                              ║
+        // ║ WHY IT NEEDS ATTENTION:                                                      ║
+        // ║ - The RunPipeline button in the UI calls this method but it has no effect   ║
+        // ║ - Users clicking "Run" will see no response or feedback                     ║
+        // ║ - Need to implement API call to backend to actually execute the pipeline    ║
+        // ║                                                                              ║
+        // ║ SUGGESTED FIX:                                                               ║
+        // ║ - Create a POST endpoint in PipelinesController to execute pipelines        ║
+        // ║ - Call: await Http.PostAsJsonAsync($"api/pipelines/{pipeline.Id}/run", ...);║
+        // ║ - Handle response and update UI with execution status                       ║
+        // ╚══════════════════════════════════════════════════════════════════════════════╝
+        await Task.CompletedTask;
+    }
+
+    private void DuplicatePipeline(PipelineViewModel pipeline)
+    {
+        EditingPipeline = new PipelineViewModel
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = pipeline.Name + " (Copy)",
+            Description = pipeline.Description,
+            Version = "1.0.0",
+            Status = "Draft",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            Steps = pipeline.Steps.Select(s => new StepViewModel
+            {
+                Id = s.Id,
+                Type = s.Type,
+                DependsOn = s.DependsOn?.ToList()
+            }).ToList(),
+            Config = pipeline.Config != null ? CloneConfig(pipeline.Config) : CreateDefaultConfig()
+        };
+        IsNewPipeline = true;
+        ShowEditor = true;
+    }
+
+    private void ConfirmDeletePipeline(PipelineViewModel pipeline)
+    {
+        // Don't allow deleting the primary pipeline
+        if (pipeline.Id == PrimaryPipelineId)
+        {
+            DeleteError = "Cannot delete the primary pipeline. Set another pipeline as primary first.";
+            PipelineToDelete = pipeline;
+            ShowDeleteConfirm = true;
+            return;
+        }
+
+        DeleteError = "";
+        PipelineToDelete = pipeline;
+        ShowDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        ShowDeleteConfirm = false;
+        PipelineToDelete = null;
+        DeleteError = "";
+    }
+
+    private async Task DeletePipeline()
+    {
+        if (PipelineToDelete == null)
+            return;
+
+        // Don't allow deleting primary pipeline
+        if (PipelineToDelete.Id == PrimaryPipelineId)
+        {
+            DeleteError = "Cannot delete the primary pipeline.";
+            return;
+        }
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/pipelines/{PipelineToDelete.Id}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Remove from local list
+                Pipelines.RemoveAll(p => p.Id == PipelineToDelete.Id);
+
+                // Clear selection if deleted pipeline was selected
+                if (SelectedPipeline?.Id == PipelineToDelete.Id)
+                {
+                    SelectedPipeline = null;
+                }
+
+                Console.WriteLine($"[PipelinesAdmin] Deleted pipeline: {PipelineToDelete.Name}");
+                ShowDeleteConfirm = false;
+                PipelineToDelete = null;
+                DeleteError = "";
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                DeleteError = $"Failed to delete: {error}";
+                Console.WriteLine($"[PipelinesAdmin] Delete failed: {error}");
+            }
+        }
+        catch (Exception ex)
+        {
+            DeleteError = $"Error: {ex.Message}";
+            Console.WriteLine($"[PipelinesAdmin] Delete error: {ex.Message}");
+        }
+    }
+
+    private async Task HandlePipelineSave(PipelineViewModel pipeline)
+    {
+        try
+        {
+            // Build the DTO for the API
+            var dto = new
+            {
+                Id = pipeline.Id,
+                Name = pipeline.Name,
+                Description = pipeline.Description,
+                Version = pipeline.Version,
+                Status = pipeline.Status,
+                CreatedAt = pipeline.CreatedAt,
+                UpdatedAt = DateTime.UtcNow,
+                Steps = pipeline.Steps?.Select(s => new
+                {
+                    Id = s.Id,
+                    Type = s.Type,
+                    Description = s.Description,
+                    DependsOn = s.DependsOn,
+                    Config = s.Config,
+                    Order = s.Order
+                }).ToList(),
+                Config = new
+                {
+                    TriggerKeywords = pipeline.Config?.TriggerKeywords ?? pipeline.Keywords ?? new List<string>(),
+                    IncludedPrompts = pipeline.Config?.IncludedPrompts ?? new List<string>(),
+                    EnabledTools = pipeline.Config?.EnabledTools ?? new List<string>(),
+                    InjectConversation = pipeline.Config?.InjectConversation ?? true,
+                    MaxContextTokens = pipeline.Config?.MaxContextTokens ?? 4096,
+                    MaxToolIterations = pipeline.Config?.MaxToolIterations ?? 10,
+                    Temperature = pipeline.Config?.Temperature ?? 0.7f,
+                    MaxOutputTokens = pipeline.Config?.MaxOutputTokens ?? 2048,
+                    EnablePlanning = pipeline.Config?.EnablePlanning ?? true,
+                    EnableValidation = pipeline.Config?.EnableValidation ?? true,
+                    PromptOverrides = pipeline.Config?.PromptOverrides != null ? new
+                    {
+                        SystemPrompt = pipeline.Config.PromptOverrides.SystemPrompt,
+                        DeveloperPrompt = pipeline.Config.PromptOverrides.DeveloperPrompt,
+                        ToolsPrompt = pipeline.Config.PromptOverrides.ToolsPrompt,
+                        PlanningPrompt = pipeline.Config.PromptOverrides.PlanningPrompt,
+                        ValidationPrompt = pipeline.Config.PromptOverrides.ValidationPrompt
+                    } : null
+                }
+            };
+
+            HttpResponseMessage response;
+            if (IsNewPipeline)
+            {
+                response = await Http.PostAsJsonAsync("api/pipelines", dto);
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync($"api/pipelines/{pipeline.Id}", dto);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Update local list
+                if (IsNewPipeline)
+                {
+                    Pipelines.Add(pipeline);
+                }
+                else
+                {
+                    var index = Pipelines.FindIndex(p => p.Id == pipeline.Id);
+                    if (index >= 0)
+                    {
+                        Pipelines[index] = pipeline;
+                    }
+                }
+                CloseEditor();
+                Console.WriteLine($"[PipelinesAdmin] Pipeline saved: {pipeline.Name}");
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[PipelinesAdmin] Failed to save pipeline: {error}");
+                // Could show error to user here
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[PipelinesAdmin] Error saving pipeline: {ex.Message}");
+        }
+    }
+
+    private void CloseEditor()
+    {
+        ShowEditor = false;
+        EditingPipeline = null;
+        IsNewPipeline = false;
+    }
+
+    private void ToggleCategory(string category)
+    {
+        if (ExpandedCategories.Contains(category))
+            ExpandedCategories.Remove(category);
+        else
+            ExpandedCategories.Add(category);
+    }
+
+    private void ViewExecutionDetails(ExecutionViewModel execution)
+    {
+        SelectedExecution = execution;
+        ShowExecutionDetails = true;
+    }
+
+    private void CloseExecutionDetails()
+    {
+        ShowExecutionDetails = false;
+        SelectedExecution = null;
+    }
+
+    private async Task CancelExecution(ExecutionViewModel execution)
+    {
+        // ╔══════════════════════════════════════════════════════════════════════════════╗
+        // ║                              NEEDS ATTENTION                                  ║
+        // ╠══════════════════════════════════════════════════════════════════════════════╣
+        // ║ ISSUE: Cancel only updates local state - not persisted to backend            ║
+        // ║                                                                              ║
+        // ║ WHY IT NEEDS ATTENTION:                                                      ║
+        // ║ - Execution continues running on server despite UI showing "Cancelled"      ║
+        // ║ - Refreshing the page will show the actual (non-cancelled) status           ║
+        // ║ - Wastes server resources on unwanted executions                            ║
+        // ║                                                                              ║
+        // ║ SUGGESTED FIX:                                                               ║
+        // ║ - Call POST api/pipelines/executions/{id}/cancel                            ║
+        // ║ - Only update local status after successful API response                    ║
+        // ║ - Backend should abort the running execution gracefully                     ║
+        // ╚══════════════════════════════════════════════════════════════════════════════╝
+        execution.Status = "Cancelled";
+        await Task.CompletedTask;
+    }
+
+    private async Task RetryExecution(ExecutionViewModel execution)
+    {
+        // ╔══════════════════════════════════════════════════════════════════════════════╗
+        // ║                              NEEDS ATTENTION                                  ║
+        // ╠══════════════════════════════════════════════════════════════════════════════╣
+        // ║ ISSUE: Retry execution is not implemented - button does nothing              ║
+        // ║                                                                              ║
+        // ║ WHY IT NEEDS ATTENTION:                                                      ║
+        // ║ - Failed pipeline executions cannot be retried                              ║
+        // ║ - Users have no way to re-run failed jobs from the admin panel              ║
+        // ║ - This breaks the expected admin workflow for managing pipelines            ║
+        // ║                                                                              ║
+        // ║ SUGGESTED FIX:                                                               ║
+        // ║ - Create POST endpoint: api/pipelines/executions/{id}/retry                 ║
+        // ║ - Call the endpoint and refresh the execution list on success               ║
+        // ║ - Show loading state while retrying                                         ║
+        // ╚══════════════════════════════════════════════════════════════════════════════╝
+        await Task.CompletedTask;
+    }
+
+    private async Task ApproveProposal(ProposalViewModel proposal)
+    {
+        // ╔══════════════════════════════════════════════════════════════════════════════╗
+        // ║                              NEEDS ATTENTION                                  ║
+        // ╠══════════════════════════════════════════════════════════════════════════════╣
+        // ║ ISSUE: Approval only updates local state - changes are NOT applied          ║
+        // ║                                                                              ║
+        // ║ WHY IT NEEDS ATTENTION:                                                      ║
+        // ║ - Approved proposals are never actually executed/applied                    ║
+        // ║ - Admin thinks they approved changes but nothing happens                    ║
+        // ║ - Defeats the entire purpose of the proposal approval workflow              ║
+        // ║                                                                              ║
+        // ║ SUGGESTED FIX:                                                               ║
+        // ║ - Call POST api/pipelines/proposals/{id}/approve                            ║
+        // ║ - Backend should apply the proposed changes                                 ║
+        // ║ - Update UI only after successful API response                              ║
+        // ╚══════════════════════════════════════════════════════════════════════════════╝
+        proposal.Status = "Approved";
+        await Task.CompletedTask;
+    }
+
+    private async Task RejectProposal(ProposalViewModel proposal)
+    {
+        // ╔══════════════════════════════════════════════════════════════════════════════╗
+        // ║                              NEEDS ATTENTION                                  ║
+        // ╠══════════════════════════════════════════════════════════════════════════════╣
+        // ║ ISSUE: Rejection only updates local state - not persisted to backend        ║
+        // ║                                                                              ║
+        // ║ WHY IT NEEDS ATTENTION:                                                      ║
+        // ║ - Rejected proposals remain in "Pending" state on server                    ║
+        // ║ - Page refresh will show proposal as pending again                          ║
+        // ║ - Could lead to accidental approval of previously rejected proposals        ║
+        // ║                                                                              ║
+        // ║ SUGGESTED FIX:                                                               ║
+        // ║ - Call POST api/pipelines/proposals/{id}/reject                             ║
+        // ║ - Update UI only after successful API response                              ║
+        // ║ - Consider adding rejection reason/comment                                  ║
+        // ╚══════════════════════════════════════════════════════════════════════════════╝
+        proposal.Status = "Rejected";
+        await Task.CompletedTask;
+    }
+
+    private void ViewProposalDiff(ProposalViewModel proposal)
+    {
+        // ╔══════════════════════════════════════════════════════════════════════════════╗
+        // ║                              NEEDS ATTENTION                                  ║
+        // ╠══════════════════════════════════════════════════════════════════════════════╣
+        // ║ ISSUE: Diff viewer is not implemented - "View Diff" button does nothing      ║
+        // ║                                                                              ║
+        // ║ WHY IT NEEDS ATTENTION:                                                      ║
+        // ║ - Admins cannot review code changes before approving proposals              ║
+        // ║ - Critical for code review workflow - blind approval is risky               ║
+        // ║ - UI has a button that promises functionality that doesn't exist            ║
+        // ║                                                                              ║
+        // ║ SUGGESTED FIX:                                                               ║
+        // ║ - Create a modal component to display side-by-side or unified diff          ║
+        // ║ - Fetch diff content from: api/pipelines/proposals/{id}/diff                ║
+        // ║ - Use a diff library like DiffPlex for rendering                            ║
+        // ╚══════════════════════════════════════════════════════════════════════════════╝
+    }
+
+    private string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalMinutes >= 1)
+            return $"{duration.TotalMinutes:F1}m";
+        return $"{duration.TotalSeconds:F1}s";
+    }
+
+    // Sample data generators
+    private List<PipelineViewModel> GenerateSamplePipelines() => new()
+    {
+        new() { Id = "1", Name = "Build & Test", Description = "Compiles the project and runs all tests", Version = "2.1.0", Status = "Active", StepCount = 5, CreatedAt = DateTime.UtcNow.AddDays(-30), UpdatedAt = DateTime.UtcNow.AddHours(-2), Steps = new() { new() { Id = "restore", Type = "build.restore" }, new() { Id = "build", Type = "build.execute", DependsOn = new() { "restore" } }, new() { Id = "test", Type = "verify.test", DependsOn = new() { "build" } } }, Config = CreateDefaultConfig() },
+        new() { Id = "2", Name = "Code Analysis", Description = "Analyzes code structure and dependencies", Version = "1.5.0", Status = "Active", StepCount = 4, CreatedAt = DateTime.UtcNow.AddDays(-20), UpdatedAt = DateTime.UtcNow.AddDays(-1), Steps = new() { new() { Id = "scan", Type = "analysis.scan-project-structure" }, new() { Id = "deps", Type = "analysis.analyze-dependencies", DependsOn = new() { "scan" } } }, Config = CreateDefaultConfig() },
+        new() { Id = "3", Name = "Security Scan", Description = "Scans for vulnerabilities in dependencies", Version = "1.0.0", Status = "Draft", StepCount = 3, CreatedAt = DateTime.UtcNow.AddDays(-5), UpdatedAt = DateTime.UtcNow.AddDays(-5), Steps = new() { new() { Id = "scan", Type = "verify.security-scan" } }, Config = CreateDefaultConfig() },
+        new() { Id = "4", Name = "Deploy Pipeline", Description = "Builds, tests, and deploys to staging", Version = "3.0.0", Status = "Active", StepCount = 8, CreatedAt = DateTime.UtcNow.AddDays(-60), UpdatedAt = DateTime.UtcNow, Steps = new() { new() { Id = "build", Type = "build.execute" }, new() { Id = "test", Type = "verify.test", DependsOn = new() { "build" } }, new() { Id = "publish", Type = "build.publish", DependsOn = new() { "test" } } }, Config = CreateDefaultConfig() }
+    };
+
+    private List<ExecutionViewModel> GenerateSampleExecutions() => new()
+    {
+        new() { Id = Guid.NewGuid().ToString(), PipelineName = "Build & Test", Status = "Completed", StartedAt = DateTime.UtcNow.AddMinutes(-5), Duration = TimeSpan.FromSeconds(45), TotalSteps = 5, CompletedSteps = 5, StepResults = new() { new() { StepId = "restore", Status = "Completed", DurationMs = 5000 }, new() { StepId = "build", Status = "Completed", DurationMs = 15000 }, new() { StepId = "test", Status = "Completed", DurationMs = 25000 } } },
+        new() { Id = Guid.NewGuid().ToString(), PipelineName = "Code Analysis", Status = "Running", StartedAt = DateTime.UtcNow.AddMinutes(-2), Duration = TimeSpan.FromSeconds(120), TotalSteps = 4, CompletedSteps = 2, StepResults = new() { new() { StepId = "scan", Status = "Completed", DurationMs = 8000 }, new() { StepId = "deps", Status = "Running", DurationMs = 0 } } },
+        new() { Id = Guid.NewGuid().ToString(), PipelineName = "Build & Test", Status = "Failed", StartedAt = DateTime.UtcNow.AddHours(-1), Duration = TimeSpan.FromSeconds(32), TotalSteps = 5, CompletedSteps = 2, StepResults = new() { new() { StepId = "restore", Status = "Completed", DurationMs = 4500 }, new() { StepId = "build", Status = "Failed", DurationMs = 27500, Error = "Build failed: CS0246 - The type or namespace 'Foo' could not be found" } } }
+    };
+
+    private List<StepRegistryItem> GenerateSampleRegistry() => new()
+    {
+        new() { TypeId = "build.detect-system", Category = "Build", Description = "Detects the build system used by a project", Version = "1.0.0", Inputs = new() { new("projectPath", true) }, Outputs = new() { "buildSystem" } },
+        new() { TypeId = "build.restore", Category = "Build", Description = "Restores project dependencies", Version = "1.0.0", Inputs = new() { new("projectPath", true), new("buildSystem", true) }, Outputs = new() { "result" } },
+        new() { TypeId = "build.execute", Category = "Build", Description = "Executes a build for the project", Version = "1.0.0", Inputs = new() { new("projectPath", true), new("buildSystem", true), new("configuration", false) }, Outputs = new() { "result", "artifacts" } },
+        new() { TypeId = "build.clean", Category = "Build", Description = "Cleans build artifacts", Version = "1.0.0", Inputs = new() { new("projectPath", true), new("buildSystem", true) }, Outputs = new() { "result" } },
+        new() { TypeId = "build.publish", Category = "Build", Description = "Publishes the project for distribution", Version = "1.0.0", Inputs = new() { new("projectPath", true), new("buildSystem", true), new("outputDirectory", false) }, Outputs = new() { "result", "artifacts" } },
+        new() { TypeId = "verify.lint", Category = "Verification", Description = "Runs linting on the code", Version = "1.0.0", Inputs = new() { new("projectPath", true), new("linter", false) }, Outputs = new() { "result", "errors", "warnings" } },
+        new() { TypeId = "verify.test", Category = "Verification", Description = "Runs the test suite", Version = "1.0.0", Inputs = new() { new("projectPath", true), new("framework", false), new("filter", false) }, Outputs = new() { "result", "passed", "failed", "skipped" } },
+        new() { TypeId = "verify.compile", Category = "Verification", Description = "Verifies the project compiles", Version = "1.0.0", Inputs = new() { new("projectPath", true), new("buildSystem", true) }, Outputs = new() { "result", "errors", "warnings" } },
+        new() { TypeId = "verify.security-scan", Category = "Verification", Description = "Scans for security vulnerabilities", Version = "1.0.0", Inputs = new() { new("projectPath", true), new("buildSystem", true) }, Outputs = new() { "result", "vulnerabilities" } },
+        new() { TypeId = "analysis.scan-project-structure", Category = "Analysis", Description = "Scans and maps the project structure", Version = "1.0.0", Inputs = new() { new("projectPath", true) }, Outputs = new() { "structure", "fileCount", "directories" } },
+        new() { TypeId = "analysis.detect-languages", Category = "Analysis", Description = "Detects programming languages used", Version = "1.0.0", Inputs = new() { new("projectPath", true) }, Outputs = new() { "languages", "primary" } },
+        new() { TypeId = "analysis.analyze-dependencies", Category = "Analysis", Description = "Analyzes project dependencies", Version = "1.0.0", Inputs = new() { new("projectPath", true) }, Outputs = new() { "dependencies", "graph" } },
+        new() { TypeId = "transform.apply-patch", Category = "Transform", Description = "Applies a code patch", Version = "1.0.0", Inputs = new() { new("filePath", true), new("patch", true) }, Outputs = new() { "success", "modifiedFile" } },
+        new() { TypeId = "transform.write-file", Category = "Transform", Description = "Writes content to a file", Version = "1.0.0", Inputs = new() { new("filePath", true), new("content", true) }, Outputs = new() { "success" } },
+        new() { TypeId = "memory.load", Category = "Memory", Description = "Loads project memory", Version = "1.0.0", Inputs = new() { new("projectId", true) }, Outputs = new() { "memory" } },
+        new() { TypeId = "memory.save", Category = "Memory", Description = "Saves project memory", Version = "1.0.0", Inputs = new() { new("projectId", true), new("memory", true) }, Outputs = new() { "success" } }
+    };
+
+    private List<ProposalViewModel> GenerateSampleProposals() => new()
+    {
+        new() { Id = "1", ProposalType = "Modify", PipelineName = "Build & Test", Description = "Add TypeScript type checking step before build", Status = "Pending", ProposedAt = DateTime.UtcNow.AddHours(-2), ProposedBy = "AI Assistant", Changes = new() { "Add new step 'typecheck' of type 'verify.typecheck'", "Set dependency: typecheck depends on restore", "Update build step to depend on typecheck" } },
+        new() { Id = "2", ProposalType = "Create", PipelineName = "Lint Pipeline", Description = "Create a new pipeline for code quality checks", Status = "Pending", ProposedAt = DateTime.UtcNow.AddHours(-5), ProposedBy = "AI Assistant", Changes = new() { "Create new pipeline 'Lint Pipeline'", "Add step 'lint' of type 'verify.lint'", "Add step 'format-check' of type 'verify.lint' with fix=false" } }
+    };
+
+    private MetricsViewModel GenerateSampleMetrics() => new()
+    {
+        TotalExecutions = 1247,
+        ExecutionsToday = 42,
+        SuccessRate = 0.943,
+        AverageDuration = TimeSpan.FromSeconds(38),
+        P95Duration = TimeSpan.FromSeconds(125),
+        ActivePipelines = 4,
+        TotalPipelines = 6,
+        StepStats = new()
+        {
+            new() { StepType = "build.execute", Executions = 523, SuccessRate = 0.96, AvgDurationMs = 15234, Failures = 21 },
+            new() { StepType = "verify.test", Executions = 498, SuccessRate = 0.89, AvgDurationMs = 28456, Failures = 55 },
+            new() { StepType = "build.restore", Executions = 512, SuccessRate = 0.99, AvgDurationMs = 4521, Failures = 5 },
+            new() { StepType = "verify.lint", Executions = 234, SuccessRate = 0.95, AvgDurationMs = 8234, Failures = 12 },
+            new() { StepType = "analysis.scan-project-structure", Executions = 156, SuccessRate = 1.0, AvgDurationMs = 2134, Failures = 0 }
+        }
+    };
+
+    private static PipelineConfigViewModel CreateDefaultConfig()
+    {
+        return new PipelineConfigViewModel
+        {
+            IncludedPrompts = new List<string> { "Core", "Tools" },
+            EnabledTools = new List<string> { "write_file", "read_file", "list_files", "run_command", "fetch" },
+            InjectConversation = true,
+            MaxContextTokens = 4096,
+            MaxToolIterations = 10,
+            Temperature = 0.7f,
+            MaxOutputTokens = 2048,
+            EnablePlanning = true,
+            EnableValidation = true
+        };
+    }
+
+    private static PipelineConfigViewModel CloneConfig(PipelineConfigViewModel source)
+    {
+        return new PipelineConfigViewModel
+        {
+            TriggerKeywords = source.TriggerKeywords.ToList(),
+            IncludedPrompts = source.IncludedPrompts.ToList(),
+            EnabledTools = source.EnabledTools.ToList(),
+            InjectConversation = source.InjectConversation,
+            MaxContextTokens = source.MaxContextTokens,
+            MaxToolIterations = source.MaxToolIterations,
+            Temperature = source.Temperature,
+            MaxOutputTokens = source.MaxOutputTokens,
+            EnablePlanning = source.EnablePlanning,
+            EnableValidation = source.EnableValidation,
+            PromptOverrides = source.PromptOverrides != null ? new PromptOverridesViewModel
+            {
+                SystemPrompt = source.PromptOverrides.SystemPrompt,
+                DeveloperPrompt = source.PromptOverrides.DeveloperPrompt,
+                ToolsPrompt = source.PromptOverrides.ToolsPrompt,
+                PlanningPrompt = source.PromptOverrides.PlanningPrompt,
+                ValidationPrompt = source.PromptOverrides.ValidationPrompt
+            } : null
+        };
+    }
+
+    // View Models
+    public class PipelineViewModel
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Version { get; set; } = "";
+        public string Status { get; set; } = "";
+        public int StepCount { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+        public List<string> Keywords { get; set; } = new();
+        public List<StepViewModel> Steps { get; set; } = new();
+        public PipelineConfigViewModel? Config { get; set; }
+    }
+
+    public class PipelineConfigViewModel
+    {
+        public List<string> TriggerKeywords { get; set; } = new();
+        public List<string> IncludedPrompts { get; set; } = new();
+        public List<string> EnabledTools { get; set; } = new();
+        public bool InjectConversation { get; set; } = true;
+        public int MaxContextTokens { get; set; } = 4096;
+        public int MaxToolIterations { get; set; } = 10;
+        public float Temperature { get; set; } = 0.7f;
+        public int MaxOutputTokens { get; set; } = 2048;
+        public bool EnablePlanning { get; set; } = true;
+        public bool EnableValidation { get; set; } = true;
+        public PromptOverridesViewModel? PromptOverrides { get; set; }
+    }
+
+    public class PromptOverridesViewModel
+    {
+        public string? SystemPrompt { get; set; }
+        public string? DeveloperPrompt { get; set; }
+        public string? ToolsPrompt { get; set; }
+        public string? PlanningPrompt { get; set; }
+        public string? ValidationPrompt { get; set; }
+    }
+
+    public class StepViewModel
+    {
+        public string Id { get; set; } = "";
+        public string Type { get; set; } = "";
+        public string? Description { get; set; }
+        public List<string>? DependsOn { get; set; }
+        public Dictionary<string, object>? Config { get; set; }
+        public int Order { get; set; }
+    }
+
+    public class ExecutionViewModel
+    {
+        public string Id { get; set; } = "";
+        public string PipelineName { get; set; } = "";
+        public string Status { get; set; } = "";
+        public DateTime StartedAt { get; set; }
+        public TimeSpan Duration { get; set; }
+        public int TotalSteps { get; set; }
+        public int CompletedSteps { get; set; }
+        public List<StepResultViewModel> StepResults { get; set; } = new();
+    }
+
+    public class StepResultViewModel
+    {
+        public string StepId { get; set; } = "";
+        public string Status { get; set; } = "";
+        public long DurationMs { get; set; }
+        public string? Error { get; set; }
+        public Dictionary<string, object>? Outputs { get; set; }
+    }
+
+    public class StepRegistryItem
+    {
+        public string TypeId { get; set; } = "";
+        public string Category { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Version { get; set; } = "";
+        public List<StepInput> Inputs { get; set; } = new();
+        public List<string> Outputs { get; set; } = new();
+    }
+
+    public record StepInput(string Name, bool Required);
+
+    public class ProposalViewModel
+    {
+        public string Id { get; set; } = "";
+        public string ProposalType { get; set; } = "";
+        public string PipelineName { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Status { get; set; } = "";
+        public DateTime ProposedAt { get; set; }
+        public string ProposedBy { get; set; } = "";
+        public List<string> Changes { get; set; } = new();
+    }
+
+    public class MetricsViewModel
+    {
+        public int TotalExecutions { get; set; }
+        public int ExecutionsToday { get; set; }
+        public double SuccessRate { get; set; }
+        public TimeSpan AverageDuration { get; set; }
+        public TimeSpan P95Duration { get; set; }
+        public int ActivePipelines { get; set; }
+        public int TotalPipelines { get; set; }
+        public List<StepStatsViewModel> StepStats { get; set; } = new();
+    }
+
+    public class StepStatsViewModel
+    {
+        public string StepType { get; set; } = "";
+        public int Executions { get; set; }
+        public double SuccessRate { get; set; }
+        public double AvgDurationMs { get; set; }
+        public int Failures { get; set; }
+    }
+}

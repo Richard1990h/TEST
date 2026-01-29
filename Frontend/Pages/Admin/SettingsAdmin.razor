@@ -1,0 +1,347 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<div class="admin-grid">
+    <div class="admin-card admin-card-wide">
+        <div class="admin-card-title">System Settings</div>
+        <div class="admin-card-sub">Configure global credit policies and system defaults.</div>
+
+        @if (_loading)
+        {
+            <div class="admin-muted" style="margin-top:12px;">⏳ Loading settings...</div>
+        }
+        else
+        {
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:20px; margin-top:20px;">
+                
+                <!-- Daily Credits Card -->
+                <div class="settings-card">
+                    <div class="settings-card-content">
+                        <h3>Free Daily Credits</h3>
+                        <p>Credits given to free users every 24 hours</p>
+                        <div class="admin-form-field" style="margin-top:12px;">
+                            <label>Amount per day</label>
+                            <input type="number" step="0.01" min="0" @bind="_freeDailyCredits" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reset Hour Card -->
+                <div class="settings-card">
+                    <div class="settings-card-content">
+                        <h3>Daily Reset Hour (UTC)</h3>
+                        <p>When daily credits reset (0-23)</p>
+                        <div class="admin-form-field" style="margin-top:12px;">
+                            <label>Hour (UTC timezone)</label>
+                            <input type="number" min="0" max="23" @bind="_resetHour" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- New User Credits Card -->
+                <div class="settings-card">
+                    <div class="settings-card-content">
+                        <h3>New User Bonus</h3>
+                        <p>Credits given to newly registered users</p>
+                        <div class="admin-form-field" style="margin-top:12px;">
+                            <label>Welcome bonus credits</label>
+                            <input type="number" step="0.01" min="0" @bind="_newUserCredits" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cost Per Message Card -->
+                <div class="settings-card">
+                    <div class="settings-card-content">
+                        <h3>Message Cost</h3>
+                        <p>Credits deducted per AI message</p>
+                        <div class="admin-form-field" style="margin-top:12px;">
+                            <label>Credits per message</label>
+                            <input type="number" step="0.01" min="0" @bind="_costPerMessage" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cost Per Token Card -->
+                <div class="settings-card">
+                    <div class="settings-card-content">
+                        <h3>Token Cost</h3>
+                        <p>Credits deducted per token used</p>
+                        <div class="admin-form-field" style="margin-top:12px;">
+                            <label>Credits per token</label>
+                            <input type="number" step="0.0001" min="0" @bind="_costPerToken" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Project Creation Base Cost Card -->
+                <div class="settings-card">
+                    <div class="settings-card-content">
+                        <h3>Project Creation Base Cost</h3>
+                        <p>Base credits for project creation (plus token cost)</p>
+                        <div class="admin-form-field" style="margin-top:12px;">
+                            <label>Base credits</label>
+                            <input type="number" step="0.1" min="0" @bind="_projectCreationBaseCost" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Code Analysis Cost Card -->
+                <div class="settings-card">
+                    <div class="settings-card-content">
+                        <h3>Code Analysis Cost</h3>
+                        <p>Credits per code analysis request</p>
+                        <div class="admin-form-field" style="margin-top:12px;">
+                            <label>Credits per analysis</label>
+                            <input type="number" step="0.1" min="0" @bind="_codeAnalysisCost" />
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div style="display:flex; gap:12px; margin-top:24px; flex-wrap:wrap;">
+                <button class="admin-btn admin-btn-primary" @onclick="SaveSettings" disabled="@_saving">
+                    @(_saving ? "⏳ Saving..." : "💾 Save All Settings")
+                </button>
+                <button class="admin-btn" @onclick="LoadSettings" disabled="@_saving">↻ Reset</button>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_message))
+            {
+                <div class="@(_isError ? "admin-error" : "admin-success")" style="margin-top:12px;">
+                    @(_isError ? "❌" : "✅") @_message
+                </div>
+            }
+        }
+    </div>
+
+    <!-- Current Status -->
+    <div class="admin-card">
+        <div class="admin-card-title">Current Config</div>
+        <div class="admin-card-sub">Live values from appsettings.json</div>
+
+        <div style="margin-top:16px;">
+            <div class="config-row">
+                <span class="config-label">Free Daily Credits:</span>
+                <span class="config-value">@_freeDailyCredits.ToString("F2")</span>
+            </div>
+            <div class="config-row">
+                <span class="config-label">Reset Hour (UTC):</span>
+                <span class="config-value">@_resetHour:00</span>
+            </div>
+            <div class="config-row">
+                <span class="config-label">New User Bonus:</span>
+                <span class="config-value">@_newUserCredits.ToString("F2")</span>
+            </div>
+            <div class="config-row">
+                <span class="config-label">Cost Per Message:</span>
+                <span class="config-value">@_costPerMessage.ToString("F4")</span>
+            </div>
+            <div class="config-row">
+                <span class="config-label">Cost Per Token:</span>
+                <span class="config-value">@_costPerToken.ToString("F4")</span>
+            </div>
+            <div class="config-row">
+                <span class="config-label">Project Base Cost:</span>
+                <span class="config-value">@_projectCreationBaseCost.ToString("F2")</span>
+            </div>
+            <div class="config-row">
+                <span class="config-label">Code Analysis Cost:</span>
+                <span class="config-value">@_codeAnalysisCost.ToString("F2")</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .settings-card {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05));
+        border: 1px solid rgba(59, 130, 246, 0.15);
+        border-radius: 16px;
+        padding: 20px;
+        display: flex;
+        gap: 16px;
+        transition: all 0.2s ease;
+    }
+
+    .settings-card:hover {
+        border-color: rgba(59, 130, 246, 0.3);
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.1);
+    }
+
+    .settings-card-icon {
+        font-size: 2rem;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(59, 130, 246, 0.1);
+        border-radius: 12px;
+        flex-shrink: 0;
+    }
+
+    .settings-card-content {
+        flex: 1;
+    }
+
+    .settings-card-content h3 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0 0 4px 0;
+    }
+
+    .settings-card-content p {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        margin: 0;
+    }
+
+    .config-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-default);
+    }
+
+    .config-row:last-child {
+        border-bottom: none;
+    }
+
+    .config-label {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+    }
+
+    .config-value {
+        font-weight: 600;
+        color: var(--cyber-green);
+        font-family: var(--font-mono);
+    }
+
+    .admin-success {
+        padding: 10px 14px;
+        border-radius: 8px;
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        color: #10b981;
+        font-size: 0.9rem;
+    }
+</style>
+
+@code {
+    private bool _loading = true;
+    private bool _saving = false;
+    private string? _message;
+    private bool _isError = false;
+
+    // Settings values
+    private double _freeDailyCredits = 50.0;
+    private int _resetHour = 0;
+    private double _newUserCredits = 50.0;
+    private double _costPerMessage = 0.01;
+    private double _costPerToken = 0.001;
+    private double _projectCreationBaseCost = 1.0;
+    private double _codeAnalysisCost = 0.5;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSettings();
+    }
+
+    private async Task LoadSettings()
+    {
+        _loading = true;
+        _message = null;
+        StateHasChanged();
+
+        try
+        {
+            var response = await Http.GetFromJsonAsync<SettingsResponse>("/api/admin/settings");
+            if (response != null)
+            {
+                _freeDailyCredits = response.FreeDailyCredits;
+                _resetHour = response.DailyResetHourUtc;
+                _newUserCredits = response.NewUserCredits;
+                _costPerMessage = response.CostPerMessage;
+                _costPerToken = response.CostPerToken;
+                _projectCreationBaseCost = response.ProjectCreationBaseCost;
+                _codeAnalysisCost = response.CodeAnalysisCost;
+            }
+        }
+        catch
+        {
+            // Use defaults if API fails
+            _freeDailyCredits = 50.0;
+            _resetHour = 0;
+            _newUserCredits = 50.0;
+            _costPerMessage = 0.01;
+            _costPerToken = 0.001;
+            _projectCreationBaseCost = 1.0;
+            _codeAnalysisCost = 0.5;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveSettings()
+    {
+        _saving = true;
+        _message = null;
+        StateHasChanged();
+
+        try
+        {
+            var payload = new
+            {
+                FreeDailyCredits = _freeDailyCredits,
+                DailyResetHourUtc = _resetHour,
+                NewUserCredits = _newUserCredits,
+                CostPerMessage = _costPerMessage,
+                CostPerToken = _costPerToken,
+                ProjectCreationBaseCost = _projectCreationBaseCost,
+                CodeAnalysisCost = _codeAnalysisCost
+            };
+
+            var response = await Http.PostAsJsonAsync("/api/admin/settings", payload);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                _message = "Settings saved successfully! Changes take effect immediately.";
+                _isError = false;
+            }
+            else
+            {
+                _message = "Failed to save settings. Please try again.";
+                _isError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            _message = $"Error: {ex.Message}";
+            _isError = true;
+        }
+        finally
+        {
+            _saving = false;
+            StateHasChanged();
+        }
+    }
+
+    private class SettingsResponse
+    {
+        public double FreeDailyCredits { get; set; }
+        public int DailyResetHourUtc { get; set; }
+        public double NewUserCredits { get; set; }
+        public double CostPerMessage { get; set; }
+        public double CostPerToken { get; set; }
+        public double ProjectCreationBaseCost { get; set; }
+        public double CodeAnalysisCost { get; set; }
+    }
+}

@@ -1,0 +1,146 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<div class="admin-grid">
+    <div class="admin-card admin-card-wide">
+        <div class="admin-card-title">System Overview</div>
+        <div class="admin-card-sub">Live counts pulled from database.</div>
+
+        @if (_loading)
+        {
+            <div class="admin-muted">Loading…</div>
+        }
+        else if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="admin-error">@_error</div>
+        }
+        else if (_stats is not null)
+        {
+            <div class="admin-stats">
+                <div class="stat">
+                    <div class="stat-label">Users</div>
+                    <div class="stat-value">@_stats.users</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Chats</div>
+                    <div class="stat-value">@_stats.chats</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Knowledge</div>
+                    <div class="stat-value">@_stats.knowledge</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Notifications</div>
+                    <div class="stat-value">@_stats.notifications</div>
+                    <div class="stat-hint">@_stats.unreadNotifications unread</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Active Subs</div>
+                    <div class="stat-value">@_stats.activeSubs</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">LLM Calls (24h)</div>
+                    <div class="stat-value">@_stats.llmCalls24h</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Build Repairs</div>
+                    <div class="stat-value">@_stats.buildRepairs</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Admin Audit</div>
+                    <div class="stat-value">@_stats.audit</div>
+                </div>
+            </div>
+        }
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
+            <button class="admin-btn" @onclick="Reload">↻ Refresh</button>
+        </div>
+    </div>
+
+    <div class="admin-card">
+        <div class="admin-card-title">Quick Actions</div>
+        <div class="admin-card-sub">Jump straight into management areas.</div>
+
+        <div class="admin-quick">
+            <div class="quick-row" @onclick="@(() => OnQuickAction?.Invoke("notifications"))">
+                <div>
+                    <span class="quick-label">Send Notification</span>
+                    <div class="quick-hint">Broadcast / targeted</div>
+                </div>
+                <span style="color:var(--text-tertiary);">→</span>
+            </div>
+            <div class="quick-row" @onclick="@(() => OnQuickAction?.Invoke("db"))">
+                <div>
+                    <span class="quick-label">Database</span>
+                    <div class="quick-hint">View / edit allowed tables</div>
+                </div>
+                <span style="color:var(--text-tertiary);">→</span>
+            </div>
+            <div class="quick-row" @onclick="@(() => OnQuickAction?.Invoke("audit"))">
+                <div>
+                    <span class="quick-label">Audit Log</span>
+                    <div class="quick-hint">Track admin actions</div>
+                </div>
+                <span style="color:var(--text-tertiary);">→</span>
+            </div>
+            <div class="quick-row" @onclick="@(() => OnQuickAction?.Invoke("users"))">
+                <div>
+                    <span class="quick-label">Users & Credits</span>
+                    <div class="quick-hint">Manage user accounts</div>
+                </div>
+                <span style="color:var(--text-tertiary);">→</span>
+            </div>
+            <div class="quick-row" @onclick="@(() => OnQuickAction?.Invoke("snapshots"))">
+                <div>
+                    <span class="quick-label">Snapshots</span>
+                    <div class="quick-hint">Database backups</div>
+                </div>
+                <span style="color:var(--text-tertiary);">→</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Action<string>? OnQuickAction { get; set; }
+
+    private bool _loading = true;
+    private string? _error;
+    private StatsDto? _stats;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    public async Task Reload()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            _stats = await Http.GetFromJsonAsync<StatsDto>("api/admin/stats");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private sealed class StatsDto
+    {
+        public long users { get; set; }
+        public long chats { get; set; }
+        public long knowledge { get; set; }
+        public long notifications { get; set; }
+        public long unreadNotifications { get; set; }
+        public long activeSubs { get; set; }
+        public long llmCalls24h { get; set; }
+        public long buildRepairs { get; set; }
+        public long audit { get; set; }
+    }
+}

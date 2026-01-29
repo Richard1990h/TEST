@@ -1,0 +1,101 @@
+@inject HttpClient Http
+
+<div class="mb-3">
+    <label for="llm-select" class="form-label fw-bold">LLM Model:</label>
+    <select id="llm-select" class="form-select" @onchange="OnModelChange">
+        @if (availableModels.Count == 0)
+        {
+            <option disabled selected>Loading models...</option>
+        }
+        else
+        {
+            @foreach (var model in availableModels)
+            {
+                <option value="@model" selected="@(model == selectedModel)">
+                    @model
+                </option>
+            }
+        }
+    </select>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="mt-2 alert @statusClass">
+            @statusMessage
+        </div>
+    }
+</div>
+
+@code {
+    private List<string> availableModels = new();
+    private string selectedModel = string.Empty;
+    private string? statusMessage;
+    private string statusClass = "alert-info";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<LittleHelperAI.Shared.Models.ModelInfoResponse>("api/llm/info");
+
+            if (response != null)
+            {
+                availableModels = response.AvailableModels ?? new();
+                selectedModel = response.CurrentModel ?? string.Empty;
+            }
+            else
+            {
+                statusMessage = "❌ Failed to load model list.";
+                statusClass = "alert-danger";
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"❌ API error: {ex.Message}";
+            statusClass = "alert-danger";
+        }
+    }
+
+    private async Task OnModelChange(ChangeEventArgs e)
+    {
+        var newModel = e.Value?.ToString() ?? "";
+        if (string.IsNullOrWhiteSpace(newModel) || newModel == selectedModel)
+            return;
+
+        selectedModel = newModel;
+        statusMessage = "Loading model...";
+        statusClass = "alert-info";
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/llm/load", new ModelSelectionRequest
+            {
+                ModelName = selectedModel
+            });
+
+            if (response.IsSuccessStatusCode)
+            {
+                statusMessage = $"✅ Model '{selectedModel}' loaded successfully.";
+                statusClass = "alert-success";
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                statusMessage = $"❌ Load failed: {error}";
+                statusClass = "alert-danger";
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"❌ Error: {ex.Message}";
+            statusClass = "alert-danger";
+        }
+
+        StateHasChanged();
+
+        // Optional: Hide status after a few seconds
+        await Task.Delay(4000);
+        statusMessage = null;
+        StateHasChanged();
+    }
+}

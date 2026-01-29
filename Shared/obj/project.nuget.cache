@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "nX4A3zGvglk=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\Richard\\Downloads\\KING0.0.0.2\\Shared\\LittleHelperAI.Shared.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Richard\\.nuget\\packages\\ilmerge\\3.0.41\\ilmerge.3.0.41.nupkg.sha512"
+  ],
+  "logs": []
+}

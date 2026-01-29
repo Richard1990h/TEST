@@ -1,0 +1,163 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<div class="notif-wrapper">
+    <button class="notif-btn"
+            @onclick="Toggle"
+            @onclick:stopPropagation
+            title="Notifications">
+        <svg class="notif-icon" width="20" height="20" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+
+        @if (_count > 0)
+        {
+            <span class="notif-badge">@_count</span>
+        }
+    </button>
+
+    @if (_open)
+    {
+        <!-- Click-away overlay -->
+        <div class="notif-overlay" @onclick="Close"></div>
+
+        <div class="notif-popover" @onclick:stopPropagation>
+            <div class="notif-header">
+                <div class="notif-title">Notifications</div>
+                <button class="notif-close"
+                        @onclick="Close"
+                        title="Close">
+                    ×
+                </button>
+            </div>
+
+            @if (_loading)
+            {
+                <div class="notif-row">Loading…</div>
+            }
+            else if (_items.Count == 0)
+            {
+                <div class="notif-row">No new notifications</div>
+            }
+            else
+            {
+                @foreach (var n in _items)
+                {
+                    <div class="notif-item"
+                         @onclick="() => Open(n)">
+                        <div class="notif-item-title">@n.Title</div>
+                        <div class="notif-item-msg">@n.Message</div>
+                        <div class="notif-item-time">
+                            @n.CreatedUtc.ToLocalTime().ToString("g")
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private bool _open;
+    private bool _loading;
+    private int _count;
+    private List<UserNotificationDto> _items = new();
+
+    // =========================
+    // INIT
+    // =========================
+    protected override async Task OnInitializedAsync()
+    {
+        await SafeRefreshAsync();
+    }
+
+    // =========================
+    // UI ACTIONS
+    // =========================
+    private async Task Toggle()
+    {
+        _open = !_open;
+        if (_open)
+            await SafeRefreshAsync();
+    }
+
+    private void Close() => _open = false;
+
+    // =========================
+    // SAFE NETWORK CALLS
+    // =========================
+    private async Task SafeRefreshAsync()
+    {
+        try
+        {
+            await RefreshAsync();
+        }
+        catch
+        {
+            _items.Clear();
+            _count = 0;
+            _loading = false;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task RefreshAsync()
+    {
+        _loading = true;
+
+        var resp = await Http.GetAsync("api/notifications/list?take=20");
+        if (!resp.IsSuccessStatusCode)
+        {
+            _items.Clear();
+            _count = 0;
+            _loading = false;
+            return;
+        }
+
+        // ✅ Only show UNREAD
+        _items =
+            (await resp.Content.ReadFromJsonAsync<List<UserNotificationDto>>()
+                ?? new())
+            .Where(n => !n.IsRead)
+            .ToList();
+
+        _count = _items.Count;
+        _loading = false;
+    }
+
+    private async Task Open(UserNotificationDto n)
+    {
+        try
+        {
+            await Http.PostAsync($"api/notifications/mark-read/{n.Id}", null);
+        }
+        catch
+        {
+            // never break UI
+        }
+
+        if (!string.IsNullOrWhiteSpace(n.ActionUrl))
+            NavigationManager.NavigateTo(n.ActionUrl);
+
+        // ✅ immediate UI update
+        await SafeRefreshAsync();
+    }
+
+    // =========================
+    // DTO
+    // =========================
+    private sealed class UserNotificationDto
+    {
+        public long Id { get; set; }
+        public string Title { get; set; } = "";
+        public string Message { get; set; } = "";
+        public string? ActionUrl { get; set; }
+        public bool IsRead { get; set; }
+        public DateTime CreatedUtc { get; set; }
+    }
+}

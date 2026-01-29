@@ -1,0 +1,325 @@
+/* ============================================
+   ANALYSIS PANEL STYLES
+   ============================================ */
+
+.analysis-panel {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(147, 51, 234, 0.05) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Header */
+.analysis-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid rgba(59, 130, 246, 0.2);
+}
+
+.analysis-header-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.checkmark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: #10b981;
+    color: white;
+    border-radius: 50%;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+/* Steps */
+.analysis-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.analysis-step {
+    display: flex;
+    gap: 1rem;
+    padding: 0.75rem;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.5);
+    transition: all 0.3s ease;
+}
+
+.analysis-step.pending {
+    opacity: 0.6;
+}
+
+.analysis-step.in-progress {
+    background: rgba(59, 130, 246, 0.1);
+    border-left: 3px solid #3b82f6;
+}
+
+.analysis-step.complete {
+    background: rgba(16, 185, 129, 0.1);
+    border-left: 3px solid #10b981;
+}
+
+.analysis-step.error {
+    background: rgba(239, 68, 68, 0.1);
+    border-left: 3px solid #ef4444;
+}
+
+.step-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    border-radius: 50%;
+    background: rgba(59, 130, 246, 0.2);
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #3b82f6;
+}
+
+.analysis-step.complete .step-number {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.analysis-step.in-progress .step-number {
+    background: rgba(59, 130, 246, 0.3);
+}
+
+.step-icon {
+    display: inline-block;
+}
+
+.spinner-small {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.step-icon.error {
+    color: #ef4444;
+}
+
+.step-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.step-name {
+    font-weight: 500;
+    color: #1f2937;
+    font-size: 0.95rem;
+}
+
+.step-message {
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+}
+
+/* Summary */
+.analysis-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 0.75rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.summary-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.summary-item.error {
+    background: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
+}
+
+.summary-item.warning {
+    background: rgba(251, 191, 36, 0.1);
+    color: #d97706;
+}
+
+.summary-item.issue {
+    background: rgba(59, 130, 246, 0.1);
+    color: #2563eb;
+}
+
+.summary-item.success {
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: currentColor;
+    color: white;
+    font-weight: bold;
+    font-size: 0.8rem;
+}
+
+.label {
+    font-weight: 500;
+}
+
+/* Details */
+.analysis-details {
+    margin-top: 1rem;
+    border-top: 1px solid rgba(59, 130, 246, 0.2);
+    padding-top: 1rem;
+}
+
+.error-section,
+.warning-section,
+.issue-section {
+    margin-bottom: 0.75rem;
+}
+
+.error-section summary {
+    color: #dc2626;
+    cursor: pointer;
+    font-weight: 500;
+    padding: 0.5rem;
+    border-radius: 6px;
+    background: rgba(239, 68, 68, 0.05);
+    user-select: none;
+}
+
+.warning-section summary {
+    color: #d97706;
+    cursor: pointer;
+    font-weight: 500;
+    padding: 0.5rem;
+    border-radius: 6px;
+    background: rgba(251, 191, 36, 0.05);
+    user-select: none;
+}
+
+.issue-section summary {
+    color: #2563eb;
+    cursor: pointer;
+    font-weight: 500;
+    padding: 0.5rem;
+    border-radius: 6px;
+    background: rgba(59, 130, 246, 0.05);
+    user-select: none;
+}
+
+summary:hover {
+    opacity: 0.8;
+}
+
+.error-list,
+.warning-list,
+.issue-list {
+    list-style: none;
+    padding: 0.5rem 0 0.5rem 2rem;
+    margin: 0;
+}
+
+.error-list li,
+.warning-list li,
+.issue-list li {
+    padding: 0.3rem 0;
+    font-size: 0.85rem;
+    color: #6b7280;
+    border-left: 2px solid currentColor;
+    padding-left: 0.75rem;
+}
+
+.more-items {
+    font-style: italic;
+    opacity: 0.7;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .analysis-panel {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%);
+        border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .analysis-header-content {
+        color: #f3f4f6;
+    }
+
+    .analysis-step {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .step-name {
+        color: #f3f4f6;
+    }
+
+    .step-message {
+        color: #d1d5db;
+    }
+
+    .analysis-summary {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .error-list li,
+    .warning-list li,
+    .issue-list li {
+        color: #d1d5db;
+    }
+}

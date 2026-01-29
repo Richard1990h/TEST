@@ -1,0 +1,166 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<div class="admin-grid">
+    <div class="admin-card admin-card-wide">
+        <div class="admin-card-title">Send Notifications</div>
+        <div class="admin-card-sub">Broadcast to all users or target by role, plan, or specific user IDs.</div>
+
+        <div class="admin-form-grid">
+            <div class="admin-form-field">
+                <label>Title</label>
+                <input @bind="_title" placeholder="e.g., Daily credits granted" />
+            </div>
+
+            <div class="admin-form-field admin-form-field-wide">
+                <label>Message</label>
+                <textarea @bind="_message" rows="4" placeholder="Message shown to users…"></textarea>
+            </div>
+
+            <div class="admin-form-field">
+                <label>Action URL (optional)</label>
+                <input @bind="_actionUrl" placeholder="/plans or /chat/123" />
+            </div>
+
+            <div class="admin-form-field">
+                <label>Target Audience</label>
+                <select @bind="_target">
+                    <option value="all">All users</option>
+                    <option value="role_user">Role: user</option>
+                    <option value="role_admin">Role: admin</option>
+                    <option value="plan">Active planId</option>
+                    <option value="userIds">Specific userIds</option>
+                </select>
+            </div>
+
+            @if (_target == "plan")
+            {
+                <div class="admin-form-field">
+                    <label>Plan ID</label>
+                    <input type="number" @bind="_planId" />
+                </div>
+            }
+            else if (_target == "userIds")
+            {
+                <div class="admin-form-field admin-form-field-wide">
+                    <label>User IDs (comma-separated)</label>
+                    <input @bind="_userIdsCsv" placeholder="e.g., 1,2,5" />
+                </div>
+            }
+        </div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:14px;">
+            <button class="admin-btn admin-btn-primary" @onclick="Send" disabled="@_sending">
+                @(_sending ? "⏳ Sending..." : "📤 Send Notification")
+            </button>
+            <button class="admin-btn" @onclick="Clear" disabled="@_sending">✕ Clear</button>
+
+            @if (!string.IsNullOrWhiteSpace(_status))
+            {
+                <span class="admin-muted">✅ @_status</span>
+            }
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="admin-error" style="margin-top:10px;">❌ @_error</div>
+        }
+    </div>
+
+    <div class="admin-card">
+        <div class="admin-card-title">💡 Tips</div>
+        <div class="admin-card-sub">Best practices for notifications.</div>
+
+        <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; gap:8px; padding:10px; background:var(--bg-tertiary); border-radius:10px;">
+                <span>📌</span>
+                <span style="color:var(--text-secondary);">Keep titles short (badge-friendly).</span>
+            </div>
+            <div style="display:flex; gap:8px; padding:10px; background:var(--bg-tertiary); border-radius:10px;">
+                <span>🔗</span>
+                <span style="color:var(--text-secondary);">Use an action URL if you want a direct button inside the notification.</span>
+            </div>
+            <div style="display:flex; gap:8px; padding:10px; background:var(--bg-tertiary); border-radius:10px;">
+                <span>💳</span>
+                <span style="color:var(--text-secondary);">Use planId targeting to message only paid users on a specific plan.</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _title = "";
+    private string _message = "";
+    private string? _actionUrl;
+    private string _target = "all";
+    private int _planId = 0;
+    private string _userIdsCsv = "";
+
+    private bool _sending;
+    private string? _error;
+    private string? _status;
+
+    private async Task Send()
+    {
+        _sending = true;
+        _error = null;
+        _status = null;
+
+        try
+        {
+            var payload = new Dictionary<string, object?>
+            {
+                ["title"] = _title,
+                ["message"] = _message,
+                ["actionUrl"] = string.IsNullOrWhiteSpace(_actionUrl) ? null : _actionUrl,
+                ["allUsers"] = _target == "all",
+            };
+
+            if (_target == "role_user") payload["role"] = "user";
+            if (_target == "role_admin") payload["role"] = "admin";
+            if (_target == "plan") payload["planId"] = _planId > 0 ? _planId : null;
+
+            if (_target == "userIds")
+            {
+                var ids = _userIdsCsv
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(x => int.TryParse(x, out var v) ? v : 0)
+                    .Where(x => x > 0)
+                    .Distinct()
+                    .ToList();
+
+                payload["userIds"] = ids;
+            }
+
+            var resp = await Http.PostAsJsonAsync("api/admin/notifications/send", payload);
+            var json = await resp.Content.ReadAsStringAsync();
+            if (!resp.IsSuccessStatusCode)
+            {
+                _error = json;
+                return;
+            }
+
+            _status = json;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
+
+    private void Clear()
+    {
+        _title = "";
+        _message = "";
+        _actionUrl = null;
+        _target = "all";
+        _planId = 0;
+        _userIdsCsv = "";
+        _error = null;
+        _status = null;
+    }
+}

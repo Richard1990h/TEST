@@ -1,0 +1,1681 @@
+@using System.Text.Json
+@using System.Text.Json.Nodes
+
+<div class="admin-modal-backdrop" @onclick="OnCancel">
+    <div class="editor-modal" @onclick:stopPropagation="true">
+        <div class="editor-header">
+            <div class="editor-title">
+                <span class="editor-icon">&#9881;</span>
+                @(IsNew ? "Create Pipeline" : "Edit Pipeline")
+            </div>
+            <div class="editor-tabs">
+                <button class="editor-tab @(ActiveView == "visual" ? "active" : "")" @onclick="@(() => ActiveView = "visual")">
+                    Visual Editor
+                </button>
+                <button class="editor-tab @(ActiveView == "json" ? "active" : "")" @onclick="@(() => SwitchToJson())">
+                    JSON Editor
+                </button>
+                <button class="editor-tab @(ActiveView == "preview" ? "active" : "")" @onclick="@(() => ActiveView = "preview")">
+                    Preview
+                </button>
+            </div>
+            <button class="editor-close" @onclick="OnCancel">&times;</button>
+        </div>
+
+        <div class="editor-content">
+            @if (ValidationErrors.Any())
+            {
+                <div class="validation-errors">
+                    <div class="validation-title">Validation Errors</div>
+                    @foreach (var error in ValidationErrors)
+                    {
+                        <div class="validation-error">@error</div>
+                    }
+                </div>
+            }
+
+            @switch (ActiveView)
+            {
+                case "visual":
+                    <div class="visual-editor">
+                        <div class="editor-sidebar">
+                            <div class="sidebar-section">
+                                <h4>Pipeline Info</h4>
+                                <div class="form-group">
+                                    <label>Name</label>
+                                    <input type="text" @bind="EditingPipeline.Name" placeholder="Pipeline name" />
+                                </div>
+                                <div class="form-group">
+                                    <label>Description</label>
+                                    <textarea @bind="EditingPipeline.Description" placeholder="Describe what this pipeline does..." rows="3"></textarea>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Version</label>
+                                        <input type="text" @bind="EditingPipeline.Version" placeholder="1.0.0" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Status</label>
+                                        <select @bind="EditingPipeline.Status">
+                                            <option value="Draft">Draft</option>
+                                            <option value="Active">Active</option>
+                                            <option value="Archived">Archived</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="sidebar-section">
+                                <h4>Add Step</h4>
+                                <div class="step-palette">
+                                    @foreach (var category in StepCategories)
+                                    {
+                                        <div class="palette-category">
+                                            <div class="palette-category-name">@category.Key</div>
+                                            <div class="palette-steps">
+                                                @foreach (var step in category.Value)
+                                                {
+                                                    <div class="palette-step" draggable="true" @onclick="@(() => AddStep(step))">
+                                                        <span class="palette-step-type">@step.Type</span>
+                                                        <span class="palette-step-add">+</span>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="canvas-area">
+                            <div class="canvas-header">
+                                <span>Pipeline Steps</span>
+                                <span class="step-count">@EditingPipeline.Steps.Count steps</span>
+                            </div>
+
+                            <div class="steps-canvas">
+                                @if (!EditingPipeline.Steps.Any())
+                                {
+                                    <div class="empty-canvas">
+                                        <div class="empty-icon">&#128203;</div>
+                                        <div class="empty-text">No steps yet</div>
+                                        <div class="empty-hint">Add steps from the palette on the left</div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="steps-flow">
+                                        @foreach (var step in EditingPipeline.Steps)
+                                        {
+                                            <div class="step-card @(SelectedStep?.Id == step.Id ? "selected" : "")" @onclick="@(() => SelectStep(step))">
+                                                <div class="step-card-header">
+                                                    <span class="step-type-badge">@GetStepCategory(step.Type)</span>
+                                                    <div class="step-actions">
+                                                        <button class="step-action-btn" title="Move Up" @onclick="@(() => MoveStepUp(step))" @onclick:stopPropagation="true" disabled="@(EditingPipeline.Steps.IndexOf(step) == 0)">
+                                                            &#8593;
+                                                        </button>
+                                                        <button class="step-action-btn" title="Move Down" @onclick="@(() => MoveStepDown(step))" @onclick:stopPropagation="true" disabled="@(EditingPipeline.Steps.IndexOf(step) == EditingPipeline.Steps.Count - 1)">
+                                                            &#8595;
+                                                        </button>
+                                                        <button class="step-action-btn danger" title="Delete" @onclick="@(() => DeleteStep(step))" @onclick:stopPropagation="true">
+                                                            &times;
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div class="step-card-body">
+                                                    <div class="step-id">@step.Id</div>
+                                                    <code class="step-type-code">@step.Type</code>
+                                                </div>
+                                                @if (step.DependsOn?.Any() == true)
+                                                {
+                                                    <div class="step-card-footer">
+                                                        <span class="deps-label">Depends on:</span>
+                                                        @foreach (var dep in step.DependsOn)
+                                                        {
+                                                            <span class="dep-badge">@dep</span>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+
+                                            @if (step != EditingPipeline.Steps.Last())
+                                            {
+                                                <div class="step-connector-visual">
+                                                    <svg width="40" height="30" viewBox="0 0 40 30">
+                                                        <path d="M20 0 L20 30" stroke="var(--border-default)" stroke-width="2" stroke-dasharray="4,4" />
+                                                        <polygon points="15,25 20,30 25,25" fill="var(--border-default)" />
+                                                    </svg>
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        @if (SelectedStep != null)
+                        {
+                            <div class="step-properties">
+                                <div class="properties-header">
+                                    <h4>Step Properties</h4>
+                                    <button class="close-properties" @onclick="@(() => SelectedStep = null)">&times;</button>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Step ID</label>
+                                    <input type="text" @bind="SelectedStep.Id" placeholder="unique-step-id" />
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Step Type</label>
+                                    <select @bind="SelectedStep.Type">
+                                        @foreach (var category in StepCategories)
+                                        {
+                                            <optgroup label="@category.Key">
+                                                @foreach (var step in category.Value)
+                                                {
+                                                    <option value="@step.Type">@step.Type</option>
+                                                }
+                                            </optgroup>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Dependencies</label>
+                                    <div class="dependencies-editor">
+                                        @if (SelectedStep.DependsOn?.Any() == true)
+                                        {
+                                            @foreach (var dep in SelectedStep.DependsOn.ToList())
+                                            {
+                                                <div class="dep-item">
+                                                    <span>@dep</span>
+                                                    <button class="dep-remove" @onclick="@(() => RemoveDependency(SelectedStep, dep))">&times;</button>
+                                                </div>
+                                            }
+                                        }
+                                        <select @onchange="AddDependency">
+                                            <option value="">+ Add dependency</option>
+                                            @foreach (var step in EditingPipeline.Steps.Where(s => s.Id != SelectedStep.Id && !(SelectedStep.DependsOn?.Contains(s.Id) ?? false)))
+                                            {
+                                                <option value="@step.Id">@step.Id</option>
+                                            }
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Condition (optional)</label>
+                                    <input type="text" @bind="SelectedStep.Condition" placeholder="e.g., outputs.previousStep.success == true" />
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Timeout (seconds)</label>
+                                    <input type="number" @bind="SelectedStep.TimeoutSeconds" min="0" />
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Retry Count</label>
+                                    <input type="number" @bind="SelectedStep.RetryCount" min="0" max="10" />
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Continue On Error</label>
+                                    <label class="toggle">
+                                        <input type="checkbox" @bind="SelectedStep.ContinueOnError" />
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Step Inputs (JSON)</label>
+                                    <textarea @bind="SelectedStepInputsJson" rows="5" class="json-input" placeholder='{ "key": "value" }'></textarea>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    break;
+
+                case "json":
+                    <div class="json-editor">
+                        <div class="json-toolbar">
+                            <button class="toolbar-btn" @onclick="FormatJson" title="Format JSON">
+                                Format
+                            </button>
+                            <button class="toolbar-btn" @onclick="ValidateJson" title="Validate JSON">
+                                Validate
+                            </button>
+                            <button class="toolbar-btn" @onclick="CopyJson" title="Copy to Clipboard">
+                                Copy
+                            </button>
+                        </div>
+                        <div class="json-container">
+                            <div class="line-numbers">
+                                @for (int i = 1; i <= JsonLineCount; i++)
+                                {
+                                    <div class="line-number">@i</div>
+                                }
+                            </div>
+                            <textarea @bind="PipelineJson" @bind:event="oninput" @onkeyup="UpdateLineCount" class="json-textarea" spellcheck="false"></textarea>
+                        </div>
+                        @if (!string.IsNullOrEmpty(JsonError))
+                        {
+                            <div class="json-error">
+                                <span class="error-icon">&#9888;</span>
+                                @JsonError
+                            </div>
+                        }
+                    </div>
+                    break;
+
+                case "preview":
+                    <div class="preview-view">
+                        <div class="preview-header">
+                            <h3>@EditingPipeline.Name</h3>
+                            <span class="preview-status status-@EditingPipeline.Status.ToLower()">@EditingPipeline.Status</span>
+                        </div>
+
+                        <div class="preview-meta">
+                            <div class="meta-item">
+                                <span class="meta-label">Version</span>
+                                <span class="meta-value">@EditingPipeline.Version</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Steps</span>
+                                <span class="meta-value">@EditingPipeline.Steps.Count</span>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(EditingPipeline.Description))
+                        {
+                            <div class="preview-description">
+                                @EditingPipeline.Description
+                            </div>
+                        }
+
+                        <div class="preview-flow">
+                            <h4>Execution Flow</h4>
+                            <div class="flow-diagram">
+                                @{
+                                    var executionOrder = GetExecutionOrder();
+                                    var currentLevel = 0;
+                                }
+                                @foreach (var level in executionOrder)
+                                {
+                                    @if (currentLevel > 0)
+                                    {
+                                        <div class="flow-connector">
+                                            <svg width="100%" height="24" viewBox="0 0 100 24" preserveAspectRatio="none">
+                                                <line x1="50%" y1="0" x2="50%" y2="24" stroke="var(--primary-500)" stroke-width="2" stroke-dasharray="4,4" />
+                                            </svg>
+                                        </div>
+                                    }
+                                    <div class="flow-level">
+                                        @foreach (var step in level)
+                                        {
+                                            <div class="flow-step">
+                                                <div class="flow-step-type">@GetStepCategory(step.Type)</div>
+                                                <div class="flow-step-id">@step.Id</div>
+                                                <code class="flow-step-code">@step.Type</code>
+                                            </div>
+                                        }
+                                    </div>
+                                    currentLevel++;
+                                }
+                            </div>
+                        </div>
+
+                        <div class="preview-json">
+                            <h4>Pipeline JSON</h4>
+                            <pre class="json-preview">@GetFormattedJson()</pre>
+                        </div>
+                    </div>
+                    break;
+            }
+        </div>
+
+        <div class="editor-footer">
+            <div class="footer-info">
+                @if (IsDirty)
+                {
+                    <span class="unsaved-indicator">Unsaved changes</span>
+                }
+            </div>
+            <div class="footer-actions">
+                <button class="admin-btn" @onclick="OnCancel">Cancel</button>
+                <button class="admin-btn admin-btn-primary" @onclick="SavePipeline" disabled="@(!CanSave)">
+                    @(IsNew ? "Create Pipeline" : "Save Changes")
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .editor-modal {
+        width: min(1400px, 95vw);
+        height: min(900px, 90vh);
+        background: var(--card-bg);
+        border: 1px solid var(--border-default);
+        border-radius: 20px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: var(--shadow-2xl);
+    }
+
+    .editor-header {
+        display: flex;
+        align-items: center;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid var(--border-default);
+        background: var(--bg-secondary);
+    }
+
+    .editor-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .editor-icon {
+        font-size: 1.25rem;
+    }
+
+    .editor-tabs {
+        display: flex;
+        gap: 0.25rem;
+        margin-left: 2rem;
+    }
+
+    .editor-tab {
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text-secondary);
+        font-weight: 600;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .editor-tab:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+    .editor-tab.active {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+        color: var(--primary-500);
+    }
+
+    .editor-close {
+        margin-left: auto;
+        width: 32px;
+        height: 32px;
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text-secondary);
+        font-size: 1.5rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .editor-close:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+    .editor-content {
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .validation-errors {
+        padding: 0.75rem 1rem;
+        background: rgba(239, 68, 68, 0.1);
+        border-bottom: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .validation-title {
+        font-weight: 700;
+        color: #ef4444;
+        margin-bottom: 0.25rem;
+    }
+
+    .validation-error {
+        font-size: 0.8rem;
+        color: #ef4444;
+    }
+
+    /* Visual Editor */
+    .visual-editor {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .editor-sidebar {
+        width: 280px;
+        border-right: 1px solid var(--border-default);
+        overflow-y: auto;
+        padding: 1rem;
+        background: var(--bg-secondary);
+    }
+
+    .sidebar-section {
+        margin-bottom: 1.5rem;
+    }
+
+    .sidebar-section h4 {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--text-tertiary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin: 0 0 0.75rem;
+    }
+
+    .form-group {
+        margin-bottom: 0.75rem;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+        margin-bottom: 0.25rem;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid var(--border-default);
+        border-radius: 8px;
+        background: var(--input-bg);
+        color: var(--text-primary);
+        font-size: 0.875rem;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: var(--primary-500);
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+    }
+
+    /* Step Palette */
+    .step-palette {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .palette-category-name {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: var(--text-tertiary);
+        margin-bottom: 0.375rem;
+        text-transform: uppercase;
+    }
+
+    .palette-steps {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .palette-step {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5rem 0.625rem;
+        border: 1px solid var(--border-default);
+        border-radius: 8px;
+        background: var(--card-bg);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .palette-step:hover {
+        border-color: var(--primary-500);
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
+    }
+
+    .palette-step-type {
+        font-size: 0.75rem;
+        font-family: var(--font-mono);
+        color: var(--text-primary);
+    }
+
+    .palette-step-add {
+        color: var(--primary-500);
+        font-weight: 700;
+    }
+
+    /* Canvas Area */
+    .canvas-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .canvas-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--border-default);
+        background: var(--bg-elevated);
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .step-count {
+        font-size: 0.75rem;
+        color: var(--text-tertiary);
+        font-weight: normal;
+    }
+
+    .steps-canvas {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.5rem;
+        background: var(--bg-canvas);
+    }
+
+    .empty-canvas {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: var(--text-tertiary);
+    }
+
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+
+    .empty-text {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+    }
+
+    .empty-hint {
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+
+    .steps-flow {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .step-card {
+        width: 100%;
+        max-width: 400px;
+        border: 2px solid var(--border-default);
+        border-radius: 12px;
+        background: var(--card-bg);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .step-card:hover {
+        border-color: var(--primary-500);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+    }
+
+    .step-card.selected {
+        border-color: var(--primary-500);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    }
+
+    .step-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid var(--border-default);
+        background: var(--bg-secondary);
+        border-radius: 10px 10px 0 0;
+    }
+
+    .step-type-badge {
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        padding: 0.25rem 0.5rem;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+        color: var(--primary-500);
+        border-radius: 4px;
+    }
+
+    .step-actions {
+        display: flex;
+        gap: 0.25rem;
+    }
+
+    .step-action-btn {
+        width: 24px;
+        height: 24px;
+        border: none;
+        border-radius: 4px;
+        background: transparent;
+        color: var(--text-secondary);
+        cursor: pointer;
+        font-size: 0.875rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .step-action-btn:hover:not(:disabled) {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+    .step-action-btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+    }
+
+    .step-action-btn.danger:hover:not(:disabled) {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+    }
+
+    .step-card-body {
+        padding: 0.75rem;
+    }
+
+    .step-id {
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 0.25rem;
+    }
+
+    .step-type-code {
+        font-size: 0.75rem;
+        font-family: var(--font-mono);
+        color: var(--text-secondary);
+        padding: 0.25rem 0.5rem;
+        background: var(--bg-secondary);
+        border-radius: 4px;
+    }
+
+    .step-card-footer {
+        padding: 0.5rem 0.75rem;
+        border-top: 1px solid var(--border-default);
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        flex-wrap: wrap;
+    }
+
+    .deps-label {
+        font-size: 0.7rem;
+        color: var(--text-tertiary);
+    }
+
+    .dep-badge {
+        font-size: 0.65rem;
+        padding: 0.125rem 0.375rem;
+        background: var(--bg-tertiary);
+        border-radius: 4px;
+        color: var(--text-secondary);
+    }
+
+    .step-connector-visual {
+        display: flex;
+        justify-content: center;
+    }
+
+    /* Step Properties Panel */
+    .step-properties {
+        width: 300px;
+        border-left: 1px solid var(--border-default);
+        overflow-y: auto;
+        padding: 1rem;
+        background: var(--bg-secondary);
+    }
+
+    .properties-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .properties-header h4 {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    .close-properties {
+        width: 24px;
+        height: 24px;
+        border: none;
+        border-radius: 4px;
+        background: transparent;
+        color: var(--text-secondary);
+        cursor: pointer;
+        font-size: 1.25rem;
+    }
+
+    .close-properties:hover {
+        background: var(--bg-hover);
+    }
+
+    .dependencies-editor {
+        display: flex;
+        flex-direction: column;
+        gap: 0.375rem;
+    }
+
+    .dep-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.375rem 0.5rem;
+        background: var(--bg-tertiary);
+        border-radius: 6px;
+        font-size: 0.8rem;
+    }
+
+    .dep-remove {
+        border: none;
+        background: transparent;
+        color: var(--text-tertiary);
+        cursor: pointer;
+        font-size: 1rem;
+    }
+
+    .dep-remove:hover {
+        color: #ef4444;
+    }
+
+    .toggle {
+        position: relative;
+        display: inline-block;
+        width: 40px;
+        height: 22px;
+    }
+
+    .toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--bg-tertiary);
+        border-radius: 11px;
+        transition: 0.2s;
+    }
+
+    .toggle-slider::before {
+        position: absolute;
+        content: "";
+        height: 16px;
+        width: 16px;
+        left: 3px;
+        bottom: 3px;
+        background: white;
+        border-radius: 50%;
+        transition: 0.2s;
+    }
+
+    .toggle input:checked + .toggle-slider {
+        background: var(--primary-500);
+    }
+
+    .toggle input:checked + .toggle-slider::before {
+        transform: translateX(18px);
+    }
+
+    .json-input {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+    }
+
+    /* JSON Editor */
+    .json-editor {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .json-toolbar {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--border-default);
+        background: var(--bg-secondary);
+    }
+
+    .toolbar-btn {
+        padding: 0.375rem 0.75rem;
+        border: 1px solid var(--border-default);
+        border-radius: 6px;
+        background: var(--card-bg);
+        color: var(--text-primary);
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .toolbar-btn:hover {
+        border-color: var(--primary-500);
+        background: var(--bg-hover);
+    }
+
+    .json-container {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+    }
+
+    .line-numbers {
+        width: 48px;
+        padding: 1rem 0.5rem;
+        background: var(--bg-secondary);
+        border-right: 1px solid var(--border-default);
+        text-align: right;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        color: var(--text-tertiary);
+        line-height: 1.5;
+        overflow: hidden;
+    }
+
+    .line-number {
+        height: 1.5em;
+    }
+
+    .json-textarea {
+        flex: 1;
+        padding: 1rem;
+        border: none;
+        background: var(--bg-canvas);
+        color: var(--text-primary);
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        line-height: 1.5;
+        resize: none;
+        outline: none;
+    }
+
+    .json-error {
+        padding: 0.75rem 1rem;
+        background: rgba(239, 68, 68, 0.1);
+        border-top: 1px solid rgba(239, 68, 68, 0.3);
+        color: #ef4444;
+        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .error-icon {
+        font-size: 1rem;
+    }
+
+    /* Preview View */
+    .preview-view {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.5rem;
+    }
+
+    .preview-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .preview-header h3 {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    .preview-status {
+        padding: 0.375rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .preview-meta {
+        display: flex;
+        gap: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .meta-item {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .meta-label {
+        font-size: 0.7rem;
+        color: var(--text-tertiary);
+        text-transform: uppercase;
+    }
+
+    .meta-value {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .preview-description {
+        padding: 1rem;
+        background: var(--bg-secondary);
+        border-radius: 10px;
+        color: var(--text-secondary);
+        margin-bottom: 1.5rem;
+    }
+
+    .preview-flow h4,
+    .preview-json h4 {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0 0 1rem;
+    }
+
+    .flow-diagram {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 1.5rem;
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+    }
+
+    .flow-level {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .flow-step {
+        padding: 1rem;
+        border: 2px solid var(--border-default);
+        border-radius: 12px;
+        background: var(--card-bg);
+        text-align: center;
+        min-width: 150px;
+    }
+
+    .flow-step-type {
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--primary-500);
+        margin-bottom: 0.25rem;
+    }
+
+    .flow-step-id {
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 0.25rem;
+    }
+
+    .flow-step-code {
+        font-size: 0.7rem;
+        color: var(--text-secondary);
+    }
+
+    .flow-connector {
+        height: 24px;
+    }
+
+    .json-preview {
+        padding: 1rem;
+        background: var(--bg-secondary);
+        border-radius: 10px;
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        overflow-x: auto;
+        white-space: pre;
+        color: var(--text-primary);
+    }
+
+    /* Footer */
+    .editor-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.25rem;
+        border-top: 1px solid var(--border-default);
+        background: var(--bg-secondary);
+    }
+
+    .footer-info {
+        font-size: 0.8rem;
+    }
+
+    .unsaved-indicator {
+        color: #eab308;
+        font-weight: 600;
+    }
+
+    .footer-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .status-draft { background: rgba(234, 179, 8, 0.15); color: #eab308; }
+    .status-active { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+    .status-archived { background: rgba(107, 114, 128, 0.15); color: #6b7280; }
+</style>
+
+@code {
+    [Parameter] public PipelinesAdmin.PipelineViewModel? Pipeline { get; set; }
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public EventCallback<PipelinesAdmin.PipelineViewModel> OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private string ActiveView = "visual";
+    private PipelineEditModel EditingPipeline = new();
+    private StepEditModel? SelectedStep = null;
+    private string SelectedStepInputsJson = "{}";
+    private string PipelineJson = "";
+    private string JsonError = "";
+    private int JsonLineCount = 1;
+    private List<string> ValidationErrors = new();
+    private bool IsDirty = false;
+
+    private bool CanSave => !string.IsNullOrWhiteSpace(EditingPipeline.Name) && !ValidationErrors.Any();
+
+    private Dictionary<string, List<StepTypeInfo>> StepCategories = new()
+    {
+        ["Build"] = new() {
+            new("build.detect-system"),
+            new("build.restore"),
+            new("build.execute"),
+            new("build.clean"),
+            new("build.publish"),
+            new("build.custom-command")
+        },
+        ["Verification"] = new() {
+            new("verify.lint"),
+            new("verify.test"),
+            new("verify.compile"),
+            new("verify.security-scan"),
+            new("verify.typecheck")
+        },
+        ["Analysis"] = new() {
+            new("analysis.scan-project-structure"),
+            new("analysis.detect-languages"),
+            new("analysis.analyze-dependencies"),
+            new("analysis.find-files"),
+            new("analysis.read-file"),
+            new("analysis.search-in-files")
+        },
+        ["Transform"] = new() {
+            new("transform.apply-patch"),
+            new("transform.write-file"),
+            new("transform.bulk-replace"),
+            new("transform.insert-content"),
+            new("transform.rename-files"),
+            new("transform.delete-files")
+        },
+        ["Memory"] = new() {
+            new("memory.load"),
+            new("memory.save"),
+            new("memory.update"),
+            new("memory.query"),
+            new("memory.add-note"),
+            new("memory.add-known-issue")
+        }
+    };
+
+    protected override void OnInitialized()
+    {
+        if (Pipeline != null)
+        {
+            EditingPipeline = new PipelineEditModel
+            {
+                Id = Pipeline.Id,
+                Name = Pipeline.Name,
+                Description = Pipeline.Description,
+                Version = Pipeline.Version,
+                Status = Pipeline.Status,
+                Steps = Pipeline.Steps.Select(s => new StepEditModel
+                {
+                    Id = s.Id,
+                    Type = s.Type,
+                    DependsOn = s.DependsOn?.ToList()
+                }).ToList(),
+                Config = Pipeline.Config != null ? new PipelineConfigEditModel
+                {
+                    TriggerKeywords = Pipeline.Config.TriggerKeywords.ToList(),
+                    IncludedPrompts = Pipeline.Config.IncludedPrompts.ToList(),
+                    EnabledTools = Pipeline.Config.EnabledTools.ToList(),
+                    InjectConversation = Pipeline.Config.InjectConversation,
+                    MaxContextTokens = Pipeline.Config.MaxContextTokens,
+                    MaxToolIterations = Pipeline.Config.MaxToolIterations,
+                    Temperature = Pipeline.Config.Temperature,
+                    MaxOutputTokens = Pipeline.Config.MaxOutputTokens,
+                    EnablePlanning = Pipeline.Config.EnablePlanning,
+                    EnableValidation = Pipeline.Config.EnableValidation,
+                    PromptOverrides = Pipeline.Config.PromptOverrides != null ? new PromptOverridesEditModel
+                    {
+                        SystemPrompt = Pipeline.Config.PromptOverrides.SystemPrompt,
+                        DeveloperPrompt = Pipeline.Config.PromptOverrides.DeveloperPrompt,
+                        ToolsPrompt = Pipeline.Config.PromptOverrides.ToolsPrompt,
+                        PlanningPrompt = Pipeline.Config.PromptOverrides.PlanningPrompt,
+                        ValidationPrompt = Pipeline.Config.PromptOverrides.ValidationPrompt
+                    } : null
+                } : new PipelineConfigEditModel()
+            };
+        }
+        else
+        {
+            EditingPipeline = new PipelineEditModel
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = "",
+                Description = "",
+                Version = "1.0.0",
+                Status = "Draft",
+                Steps = new(),
+                Config = new PipelineConfigEditModel()
+            };
+        }
+
+        UpdatePipelineJson();
+    }
+
+    private void SwitchToJson()
+    {
+        UpdatePipelineJson();
+        ActiveView = "json";
+    }
+
+    private void UpdatePipelineJson()
+    {
+        var json = new
+        {
+            id = EditingPipeline.Id,
+            name = EditingPipeline.Name,
+            description = EditingPipeline.Description,
+            version = EditingPipeline.Version,
+            status = EditingPipeline.Status,
+            config = new
+            {
+                triggerKeywords = EditingPipeline.Config.TriggerKeywords,
+                includedPrompts = EditingPipeline.Config.IncludedPrompts,
+                enabledTools = EditingPipeline.Config.EnabledTools,
+                injectConversation = EditingPipeline.Config.InjectConversation,
+                maxContextTokens = EditingPipeline.Config.MaxContextTokens,
+                maxToolIterations = EditingPipeline.Config.MaxToolIterations,
+                temperature = EditingPipeline.Config.Temperature,
+                maxOutputTokens = EditingPipeline.Config.MaxOutputTokens,
+                enablePlanning = EditingPipeline.Config.EnablePlanning,
+                enableValidation = EditingPipeline.Config.EnableValidation,
+                promptOverrides = EditingPipeline.Config.PromptOverrides != null ? new
+                {
+                    systemPrompt = EditingPipeline.Config.PromptOverrides.SystemPrompt,
+                    developerPrompt = EditingPipeline.Config.PromptOverrides.DeveloperPrompt,
+                    toolsPrompt = EditingPipeline.Config.PromptOverrides.ToolsPrompt,
+                    planningPrompt = EditingPipeline.Config.PromptOverrides.PlanningPrompt,
+                    validationPrompt = EditingPipeline.Config.PromptOverrides.ValidationPrompt
+                } : null
+            },
+            steps = EditingPipeline.Steps.Select(s => new
+            {
+                id = s.Id,
+                type = s.Type,
+                dependsOn = s.DependsOn,
+                condition = s.Condition,
+                timeoutSeconds = s.TimeoutSeconds,
+                retryCount = s.RetryCount,
+                continueOnError = s.ContinueOnError,
+                inputs = s.Inputs
+            })
+        };
+
+        PipelineJson = JsonSerializer.Serialize(json, new JsonSerializerOptions { WriteIndented = true });
+        UpdateLineCount();
+    }
+
+    private void UpdateLineCount()
+    {
+        JsonLineCount = PipelineJson.Split('\n').Length;
+    }
+
+    private void FormatJson()
+    {
+        try
+        {
+            var parsed = JsonNode.Parse(PipelineJson);
+            PipelineJson = parsed?.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) ?? PipelineJson;
+            JsonError = "";
+            UpdateLineCount();
+        }
+        catch (Exception ex)
+        {
+            JsonError = ex.Message;
+        }
+    }
+
+    private void ValidateJson()
+    {
+        try
+        {
+            var parsed = JsonNode.Parse(PipelineJson);
+            JsonError = "";
+
+            // Apply JSON back to model
+            if (parsed is JsonObject obj)
+            {
+                EditingPipeline.Name = obj["name"]?.GetValue<string>() ?? "";
+                EditingPipeline.Description = obj["description"]?.GetValue<string>() ?? "";
+                EditingPipeline.Version = obj["version"]?.GetValue<string>() ?? "1.0.0";
+                EditingPipeline.Status = obj["status"]?.GetValue<string>() ?? "Draft";
+
+                EditingPipeline.Config = ParseConfig(obj["config"] as JsonObject);
+
+                EditingPipeline.Steps.Clear();
+                if (obj["steps"] is JsonArray steps)
+                {
+                    foreach (var step in steps)
+                    {
+                        if (step is JsonObject stepObj)
+                        {
+                            var deps = new List<string>();
+                            if (stepObj["dependsOn"] is JsonArray depsArray)
+                            {
+                                foreach (var dep in depsArray)
+                                {
+                                    deps.Add(dep?.GetValue<string>() ?? "");
+                                }
+                            }
+
+                            EditingPipeline.Steps.Add(new StepEditModel
+                            {
+                                Id = stepObj["id"]?.GetValue<string>() ?? "",
+                                Type = stepObj["type"]?.GetValue<string>() ?? "",
+                                DependsOn = deps.Any() ? deps : null,
+                                Condition = stepObj["condition"]?.GetValue<string>(),
+                                TimeoutSeconds = stepObj["timeoutSeconds"]?.GetValue<int>() ?? 0,
+                                RetryCount = stepObj["retryCount"]?.GetValue<int>() ?? 0,
+                                ContinueOnError = stepObj["continueOnError"]?.GetValue<bool>() ?? false
+                            });
+                        }
+                    }
+                }
+            }
+
+            IsDirty = true;
+        }
+        catch (Exception ex)
+        {
+            JsonError = "Invalid JSON: " + ex.Message;
+        }
+    }
+
+    private static PipelineConfigEditModel ParseConfig(JsonObject? configObj)
+    {
+        var config = new PipelineConfigEditModel();
+        if (configObj == null)
+        {
+            return config;
+        }
+
+        config.TriggerKeywords = ReadStringArray(configObj, "triggerKeywords");
+        config.IncludedPrompts = ReadStringArray(configObj, "includedPrompts");
+        config.EnabledTools = ReadStringArray(configObj, "enabledTools");
+        config.InjectConversation = configObj["injectConversation"]?.GetValue<bool>() ?? true;
+        config.MaxContextTokens = configObj["maxContextTokens"]?.GetValue<int>() ?? 4096;
+        config.MaxToolIterations = configObj["maxToolIterations"]?.GetValue<int>() ?? 10;
+        config.Temperature = configObj["temperature"]?.GetValue<float>() ?? 0.7f;
+        config.MaxOutputTokens = configObj["maxOutputTokens"]?.GetValue<int>() ?? 2048;
+        config.EnablePlanning = configObj["enablePlanning"]?.GetValue<bool>() ?? true;
+        config.EnableValidation = configObj["enableValidation"]?.GetValue<bool>() ?? true;
+
+        if (configObj["promptOverrides"] is JsonObject promptOverrides)
+        {
+            config.PromptOverrides = new PromptOverridesEditModel
+            {
+                SystemPrompt = promptOverrides["systemPrompt"]?.GetValue<string>(),
+                DeveloperPrompt = promptOverrides["developerPrompt"]?.GetValue<string>(),
+                ToolsPrompt = promptOverrides["toolsPrompt"]?.GetValue<string>(),
+                PlanningPrompt = promptOverrides["planningPrompt"]?.GetValue<string>(),
+                ValidationPrompt = promptOverrides["validationPrompt"]?.GetValue<string>()
+            };
+        }
+
+        return config;
+    }
+
+    private static List<string> ReadStringArray(JsonObject obj, string key)
+    {
+        if (obj[key] is not JsonArray array)
+        {
+            return new List<string>();
+        }
+
+        return array
+            .Select(v => v?.GetValue<string>() ?? "")
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .ToList();
+    }
+
+    private void CopyJson()
+    {
+        // Note: In a real app, use JS interop to copy to clipboard
+    }
+
+    private void AddStep(StepTypeInfo stepType)
+    {
+        var stepId = GenerateStepId(stepType.Type);
+        var step = new StepEditModel
+        {
+            Id = stepId,
+            Type = stepType.Type
+        };
+        EditingPipeline.Steps.Add(step);
+        SelectedStep = step;
+        IsDirty = true;
+    }
+
+    private string GenerateStepId(string stepType)
+    {
+        var baseName = stepType.Split('.').Last().Replace("-", "");
+        var count = EditingPipeline.Steps.Count(s => s.Type == stepType);
+        return count == 0 ? baseName : $"{baseName}{count + 1}";
+    }
+
+    private void SelectStep(StepEditModel step)
+    {
+        SelectedStep = step;
+        SelectedStepInputsJson = step.Inputs != null
+            ? JsonSerializer.Serialize(step.Inputs, new JsonSerializerOptions { WriteIndented = true })
+            : "{}";
+    }
+
+    private void DeleteStep(StepEditModel step)
+    {
+        EditingPipeline.Steps.Remove(step);
+        if (SelectedStep == step)
+        {
+            SelectedStep = null;
+        }
+
+        // Remove dependencies on this step
+        foreach (var s in EditingPipeline.Steps)
+        {
+            s.DependsOn?.Remove(step.Id);
+        }
+
+        IsDirty = true;
+    }
+
+    private void MoveStepUp(StepEditModel step)
+    {
+        var index = EditingPipeline.Steps.IndexOf(step);
+        if (index > 0)
+        {
+            EditingPipeline.Steps.RemoveAt(index);
+            EditingPipeline.Steps.Insert(index - 1, step);
+            IsDirty = true;
+        }
+    }
+
+    private void MoveStepDown(StepEditModel step)
+    {
+        var index = EditingPipeline.Steps.IndexOf(step);
+        if (index < EditingPipeline.Steps.Count - 1)
+        {
+            EditingPipeline.Steps.RemoveAt(index);
+            EditingPipeline.Steps.Insert(index + 1, step);
+            IsDirty = true;
+        }
+    }
+
+    private void AddDependency(ChangeEventArgs e)
+    {
+        if (SelectedStep == null || string.IsNullOrEmpty(e.Value?.ToString())) return;
+
+        SelectedStep.DependsOn ??= new();
+        SelectedStep.DependsOn.Add(e.Value.ToString()!);
+        IsDirty = true;
+    }
+
+    private void RemoveDependency(StepEditModel step, string dep)
+    {
+        step.DependsOn?.Remove(dep);
+        IsDirty = true;
+    }
+
+    private string GetStepCategory(string stepType)
+    {
+        var prefix = stepType.Split('.')[0];
+        return prefix switch
+        {
+            "build" => "Build",
+            "verify" => "Verify",
+            "analysis" => "Analysis",
+            "transform" => "Transform",
+            "memory" => "Memory",
+            _ => "Custom"
+        };
+    }
+
+    private List<List<StepEditModel>> GetExecutionOrder()
+    {
+        var result = new List<List<StepEditModel>>();
+        var remaining = EditingPipeline.Steps.ToList();
+        var completed = new HashSet<string>();
+
+        while (remaining.Any())
+        {
+            var level = remaining
+                .Where(s => s.DependsOn == null || s.DependsOn.All(d => completed.Contains(d)))
+                .ToList();
+
+            if (!level.Any())
+            {
+                // Circular dependency or missing dependency
+                result.Add(remaining);
+                break;
+            }
+
+            result.Add(level);
+            foreach (var step in level)
+            {
+                completed.Add(step.Id);
+                remaining.Remove(step);
+            }
+        }
+
+        return result;
+    }
+
+    private string GetFormattedJson()
+    {
+        UpdatePipelineJson();
+        return PipelineJson;
+    }
+
+    private async Task SavePipeline()
+    {
+        Validate();
+        if (ValidationErrors.Any()) return;
+
+        var pipeline = new PipelinesAdmin.PipelineViewModel
+        {
+            Id = EditingPipeline.Id,
+            Name = EditingPipeline.Name,
+            Description = EditingPipeline.Description,
+            Version = EditingPipeline.Version,
+            Status = EditingPipeline.Status,
+            StepCount = EditingPipeline.Steps.Count,
+            CreatedAt = IsNew ? DateTime.UtcNow : Pipeline?.CreatedAt ?? DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            Steps = EditingPipeline.Steps.Select(s => new PipelinesAdmin.StepViewModel
+            {
+                Id = s.Id,
+                Type = s.Type,
+                DependsOn = s.DependsOn
+            }).ToList(),
+            Config = new PipelinesAdmin.PipelineConfigViewModel
+            {
+                TriggerKeywords = EditingPipeline.Config.TriggerKeywords.ToList(),
+                IncludedPrompts = EditingPipeline.Config.IncludedPrompts.ToList(),
+                EnabledTools = EditingPipeline.Config.EnabledTools.ToList(),
+                InjectConversation = EditingPipeline.Config.InjectConversation,
+                MaxContextTokens = EditingPipeline.Config.MaxContextTokens,
+                MaxToolIterations = EditingPipeline.Config.MaxToolIterations,
+                Temperature = EditingPipeline.Config.Temperature,
+                MaxOutputTokens = EditingPipeline.Config.MaxOutputTokens,
+                EnablePlanning = EditingPipeline.Config.EnablePlanning,
+                EnableValidation = EditingPipeline.Config.EnableValidation,
+                PromptOverrides = EditingPipeline.Config.PromptOverrides != null ? new PipelinesAdmin.PromptOverridesViewModel
+                {
+                    SystemPrompt = EditingPipeline.Config.PromptOverrides.SystemPrompt,
+                    DeveloperPrompt = EditingPipeline.Config.PromptOverrides.DeveloperPrompt,
+                    ToolsPrompt = EditingPipeline.Config.PromptOverrides.ToolsPrompt,
+                    PlanningPrompt = EditingPipeline.Config.PromptOverrides.PlanningPrompt,
+                    ValidationPrompt = EditingPipeline.Config.PromptOverrides.ValidationPrompt
+                } : null
+            }
+        };
+
+        await OnSave.InvokeAsync(pipeline);
+    }
+
+    private void Validate()
+    {
+        ValidationErrors.Clear();
+
+        if (string.IsNullOrWhiteSpace(EditingPipeline.Name))
+        {
+            ValidationErrors.Add("Pipeline name is required");
+        }
+
+        if (!EditingPipeline.Steps.Any())
+        {
+            ValidationErrors.Add("Pipeline must have at least one step");
+        }
+
+        var stepIds = EditingPipeline.Steps.Select(s => s.Id).ToList();
+        var duplicates = stepIds.GroupBy(x => x).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+        if (duplicates.Any())
+        {
+            ValidationErrors.Add($"Duplicate step IDs: {string.Join(", ", duplicates)}");
+        }
+
+        foreach (var step in EditingPipeline.Steps)
+        {
+            if (string.IsNullOrWhiteSpace(step.Id))
+            {
+                ValidationErrors.Add($"Step with type '{step.Type}' has no ID");
+            }
+
+            if (step.DependsOn != null)
+            {
+                foreach (var dep in step.DependsOn)
+                {
+                    if (!stepIds.Contains(dep))
+                    {
+                        ValidationErrors.Add($"Step '{step.Id}' depends on non-existent step '{dep}'");
+                    }
+                }
+            }
+        }
+    }
+
+    private record StepTypeInfo(string Type);
+
+    private class PipelineEditModel
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Version { get; set; } = "1.0.0";
+        public string Status { get; set; } = "Draft";
+        public List<StepEditModel> Steps { get; set; } = new();
+        public PipelineConfigEditModel Config { get; set; } = new();
+    }
+
+    private class PipelineConfigEditModel
+    {
+        public List<string> TriggerKeywords { get; set; } = new();
+        public List<string> IncludedPrompts { get; set; } = new();
+        public List<string> EnabledTools { get; set; } = new();
+        public bool InjectConversation { get; set; } = true;
+        public int MaxContextTokens { get; set; } = 4096;
+        public int MaxToolIterations { get; set; } = 10;
+        public float Temperature { get; set; } = 0.7f;
+        public int MaxOutputTokens { get; set; } = 2048;
+        public bool EnablePlanning { get; set; } = true;
+        public bool EnableValidation { get; set; } = true;
+        public PromptOverridesEditModel? PromptOverrides { get; set; }
+    }
+
+    private class PromptOverridesEditModel
+    {
+        public string? SystemPrompt { get; set; }
+        public string? DeveloperPrompt { get; set; }
+        public string? ToolsPrompt { get; set; }
+        public string? PlanningPrompt { get; set; }
+        public string? ValidationPrompt { get; set; }
+    }
+
+    private class StepEditModel
+    {
+        public string Id { get; set; } = "";
+        public string Type { get; set; } = "";
+        public List<string>? DependsOn { get; set; }
+        public string? Condition { get; set; }
+        public int TimeoutSeconds { get; set; }
+        public int RetryCount { get; set; }
+        public bool ContinueOnError { get; set; }
+        public Dictionary<string, object>? Inputs { get; set; }
+    }
+}

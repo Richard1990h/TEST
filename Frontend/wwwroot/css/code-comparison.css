@@ -1,0 +1,419 @@
+/* Code Comparison View Styles - Enhanced Diff Highlighting */
+
+.code-comparison-view {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 1rem;
+    min-height: 400px;
+}
+
+.comparison-panel {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+}
+
+.comparison-panel.original-panel {
+    border-left: 4px solid #f59e0b;
+}
+
+.comparison-panel.fixed-panel {
+    border-left: 4px solid #22c55e;
+}
+
+.code-panel-header {
+    padding: 0.75rem 1rem;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    font-weight: 600;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    color: var(--text-primary);
+}
+
+.code-panel-header .line-count {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+}
+
+.code-panel-header .diff-indicator {
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.code-panel-header .diff-indicator.success {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+}
+
+.comparison-panel.original-panel .code-panel-header {
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.05);
+}
+
+.comparison-panel.fixed-panel .code-panel-header {
+    color: #22c55e;
+    background: rgba(34, 197, 94, 0.05);
+}
+
+.code-viewer {
+    flex: 1;
+    overflow-y: auto;
+    font-family: 'Courier New', 'Monaco', monospace;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    padding: 0.5rem 0;
+    background: var(--code-bg);
+    color: var(--code-text);
+}
+
+.code-line {
+    display: flex;
+    align-items: flex-start;
+    padding: 0.25rem 0;
+    min-height: 1.5em;
+    transition: background-color 0.2s ease;
+}
+
+.code-line:hover {
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.line-num {
+    display: inline-block;
+    width: 3rem;
+    padding: 0 0.5rem;
+    text-align: right;
+    color: var(--text-tertiary);
+    user-select: none;
+    background: var(--bg-tertiary);
+    border-right: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+/* Diff Marker Column */
+.diff-marker {
+    display: inline-block;
+    width: 1.5rem;
+    text-align: center;
+    font-weight: 700;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.diff-line-added .diff-marker {
+    color: #22c55e;
+    background: rgba(34, 197, 94, 0.1);
+}
+
+.diff-line-removed .diff-marker {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.diff-line-modified .diff-marker {
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.line-code {
+    flex: 1;
+    padding: 0 1rem;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: inherit;
+}
+
+/* Original Code Styling */
+.original-view .line-code {
+    color: var(--code-text);
+}
+
+/* Fixed Code Styling */
+.fixed-view .line-code {
+    color: var(--code-text);
+}
+
+/* Diff Line Highlighting */
+.diff-line-added {
+    background: rgba(34, 197, 94, 0.08) !important;
+}
+
+.diff-line-added .line-num {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+}
+
+.diff-line-added .line-code {
+    color: #22c55e;
+}
+
+.diff-line-removed {
+    background: rgba(239, 68, 68, 0.08) !important;
+}
+
+.diff-line-removed .line-num {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.diff-line-removed .line-code {
+    color: #ef4444;
+    text-decoration: line-through;
+    opacity: 0.8;
+}
+
+.diff-line-modified {
+    background: rgba(245, 158, 11, 0.08) !important;
+}
+
+.diff-line-modified .line-num {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+/* Inline Diff Highlighting */
+.diff-added-text {
+    background: rgba(34, 197, 94, 0.25);
+    color: #22c55e;
+    padding: 0 2px;
+    border-radius: 2px;
+}
+
+.diff-removed-text {
+    background: rgba(239, 68, 68, 0.25);
+    color: #ef4444;
+    text-decoration: line-through;
+    padding: 0 2px;
+    border-radius: 2px;
+}
+
+.diff-highlight {
+    background: rgba(245, 158, 11, 0.3);
+    color: #f59e0b;
+    padding: 0 2px;
+    border-radius: 2px;
+    font-weight: 600;
+    border-bottom: 2px solid #f59e0b;
+}
+
+/* Single View Styling */
+.original-view,
+.fixed-view {
+    margin-top: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    min-height: 300px;
+    background: var(--bg-secondary);
+}
+
+.original-view {
+    border-left: 4px solid #f59e0b;
+}
+
+.fixed-view {
+    border-left: 4px solid #22c55e;
+}
+
+.original-view .code-panel-header {
+    background: rgba(245, 158, 11, 0.05);
+    color: #f59e0b;
+}
+
+.fixed-view .code-panel-header {
+    background: rgba(34, 197, 94, 0.05);
+    color: #22c55e;
+}
+
+/* Scrollbar Styling */
+.code-viewer::-webkit-scrollbar {
+    width: 8px;
+}
+
+.code-viewer::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+.code-viewer::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+.code-viewer::-webkit-scrollbar-thumb:hover {
+    background: var(--text-tertiary);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .code-comparison-view {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .code-comparison-view {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .code-viewer {
+        max-height: 300px;
+    }
+
+    .line-num {
+        width: 2.5rem;
+        font-size: 0.8rem;
+    }
+
+    .diff-marker {
+        width: 1.2rem;
+        font-size: 0.8rem;
+    }
+
+    .line-code {
+        font-size: 0.8rem;
+    }
+}
+
+/* Dark Mode */
+[data-theme="dark"] .code-panel-header {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .comparison-panel {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .line-num {
+    background: rgba(255, 255, 255, 0.05);
+    border-right-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .diff-line-added {
+    background: rgba(34, 197, 94, 0.12) !important;
+}
+
+[data-theme="dark"] .diff-line-removed {
+    background: rgba(239, 68, 68, 0.12) !important;
+}
+
+[data-theme="dark"] .diff-line-modified {
+    background: rgba(245, 158, 11, 0.12) !important;
+}
+
+[data-theme="dark"] .diff-highlight {
+    background: rgba(245, 158, 11, 0.4);
+}
+
+[data-theme="dark"] .diff-added-text {
+    background: rgba(34, 197, 94, 0.35);
+}
+
+[data-theme="dark"] .diff-removed-text {
+    background: rgba(239, 68, 68, 0.35);
+}
+
+/* Animation */
+.code-comparison-view {
+    animation: fadeIn 0.3s ease-in;
+}
+
+.original-view,
+.fixed-view {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Diff Summary Badge */
+.diff-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.diff-summary.changes {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.diff-summary.fixes {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+}
+
+/* Applied Fixes List */
+.applied-fixes-list {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: rgba(34, 197, 94, 0.05);
+    border: 1px solid rgba(34, 197, 94, 0.2);
+    border-radius: 8px;
+}
+
+.applied-fix-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(34, 197, 94, 0.1);
+}
+
+.applied-fix-item:last-child {
+    border-bottom: none;
+}
+
+.fix-icon {
+    color: #22c55e;
+    font-size: 1rem;
+}
+
+.fix-details {
+    flex: 1;
+}
+
+.fix-rule {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.fix-description {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+}
+
+.fix-line {
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}

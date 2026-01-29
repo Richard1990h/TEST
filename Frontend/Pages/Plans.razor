@@ -1,0 +1,472 @@
+@page "/plans"
+@inject HttpClient Http
+@inject UserSessionService Session
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@using LittleHelperAI.Shared.Models
+@implements IDisposable
+
+<PageTitle>Plans & Credits</PageTitle>
+
+<style>
+    /* Modern AI/Tech Plans Page - Futuristic Design 2025 */
+    .plans-content {
+        padding: 2.5rem;
+        max-width: 1100px;
+        margin: 0 auto;
+        min-height: 100vh;
+        background: var(--bg-canvas);
+    }
+
+    .plans-header {
+        margin-bottom: 3.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+    }
+
+    .plans-header h2 {
+        font-size: 2.25rem;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: -0.03em;
+        background: linear-gradient(135deg, var(--text-primary) 0%, var(--primary-500) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    [data-theme="dark"] .plans-header h2 {
+        background: linear-gradient(135deg, #f1f5f9 0%, var(--primary-400) 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+    }
+
+    .plans-header p {
+        color: var(--text-secondary);
+        margin-top: 0.5rem;
+        font-size: 1rem;
+    }
+
+    .credits-display {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+        padding: 0.875rem 1.5rem;
+        border-radius: 14px;
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        font-weight: 600;
+        color: var(--primary-500);
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.1);
+    }
+
+    [data-theme="dark"] .credits-display {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15), 0 0 30px rgba(59, 130, 246, 0.05);
+    }
+
+    .plans-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 2rem;
+    }
+
+    .plan-card {
+        background: var(--bg-glass);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 2rem;
+        border: 1px solid var(--border-default);
+        display: flex;
+        flex-direction: column;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    [data-theme="dark"] .plan-card {
+        background: rgba(15, 22, 41, 0.7);
+    }
+
+    .plan-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--primary-500), var(--accent-purple));
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .plan-card:hover {
+        border-color: rgba(59, 130, 246, 0.4);
+        box-shadow: var(--shadow-xl), 0 0 40px rgba(59, 130, 246, 0.1);
+        transform: translateY(-4px);
+    }
+
+    .plan-card:hover::before {
+        opacity: 1;
+    }
+
+    [data-theme="dark"] .plan-card:hover {
+        box-shadow: var(--shadow-2xl), 0 0 60px rgba(59, 130, 246, 0.15);
+    }
+
+    .plan-badge {
+        position: absolute;
+        top: 1.25rem;
+        right: -2.25rem;
+        background: linear-gradient(135deg, var(--primary-500) 0%, var(--accent-purple) 100%);
+        color: white;
+        padding: 0.35rem 3.5rem;
+        transform: rotate(45deg);
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        box-shadow: 0 2px 10px rgba(59, 130, 246, 0.3);
+    }
+
+    .plan-type {
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--text-tertiary);
+        margin-bottom: 0.5rem;
+        letter-spacing: 0.08em;
+    }
+
+    .plan-credits {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        margin-bottom: 1rem;
+        letter-spacing: -0.03em;
+    }
+
+    .plan-credits span {
+        font-size: 1rem;
+        color: var(--text-tertiary);
+        font-weight: 500;
+    }
+
+    .plan-features {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 2rem 0;
+        flex: 1;
+    }
+
+    .plan-features li {
+        font-size: 0.95rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.875rem;
+        display: flex;
+        align-items: center;
+        padding: 0.5rem 0;
+    }
+
+    .plan-features li::before {
+        content: "✓";
+        color: var(--color-success);
+        font-weight: 700;
+        margin-right: 0.875rem;
+        width: 22px;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(16, 185, 129, 0.1);
+        border-radius: 50%;
+        font-size: 0.75rem;
+    }
+
+    .buy-btn {
+        width: 100%;
+        padding: 0.9rem 1.25rem;
+        background: var(--btn-primary-bg);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    }
+
+    .buy-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s ease;
+    }
+
+    .buy-btn:hover:not(:disabled)::before {
+        left: 100%;
+    }
+
+    .buy-btn:hover:not(:disabled) {
+        background: var(--btn-primary-hover);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 25px rgba(59, 130, 246, 0.4);
+    }
+
+    [data-theme="dark"] .buy-btn {
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4), 0 0 40px rgba(59, 130, 246, 0.1);
+    }
+
+    .buy-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+
+    .status-msg {
+        margin-top: 2.5rem;
+        padding: 1.25rem;
+        text-align: center;
+        font-weight: 600;
+    }
+
+    .status-msg.error { 
+        background: rgba(239, 68, 68, 0.1); 
+        color: var(--error-color); 
+        border: 1px solid rgba(239, 68, 68, 0.2); 
+    }
+    .status-msg.success { 
+        background: rgba(16, 185, 129, 0.1); 
+        color: var(--success-color); 
+        border: 1px solid rgba(16, 185, 129, 0.2); 
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem;
+        background: var(--bg-elevated);
+        border-radius: 16px;
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+    }
+</style>
+
+<div class="plans-content">
+    <div class="plans-header">
+        <div>
+            <h2>Choose Your Plan</h2>
+            <p>Get more credits to keep the conversation going.</p>
+        </div>
+        <div class="credits-display">
+             @Session.GetUser()?.Credits Credits
+        </div>
+    </div>
+
+    <!-- Active Plan Section -->
+    @if (_planStatus is not null && _planStatus.HasActivePlan)
+    {
+        <div style="margin-bottom: 2rem; padding: 1.5rem; background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.1)); border-radius: 16px; border: 1px solid rgba(16, 185, 129, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                <div>
+                    <div style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--text-tertiary); letter-spacing: 0.08em;">Active Plan</div>
+                    <div style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary); margin-top: 0.25rem;">
+                        @(_planStatus.PlanName ?? "Subscription")
+                    </div>
+                    @if (_planStatus.IsUnlimited)
+                    {
+                        <div style="margin-top: 0.5rem; font-size: 0.95rem; color: #10b981; font-weight: 600;">
+                            ✨ Unlimited Usage
+                        </div>
+                    }
+                    else if (_planStatus.DailyCreditsAllowance.HasValue)
+                    {
+                        <div style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-secondary);">
+                            Daily Credits: <b>@_planStatus.DailyCreditsRemaining?.ToString("0.##")</b> / @_planStatus.DailyCreditsAllowance?.ToString("0.##") remaining
+                        </div>
+                    }
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 0.85rem; color: var(--text-secondary);">Wallet Balance</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary-500);">@_planStatus.WalletCredits.ToString("0.##") credits</div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div style="margin-bottom: 2rem; padding: 1.5rem; background: var(--bg-elevated); border-radius: 16px; border: 1px solid var(--border-default);">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                <div>
+                    <div style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--text-tertiary); letter-spacing: 0.08em;">Current Plan</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-top: 0.25rem;">
+                        Free Tier
+                    </div>
+                    <div style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-secondary);">
+                        Purchase credits or subscribe for premium features
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 0.85rem; color: var(--text-secondary);">Wallet Balance</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary-500);">@(_planStatus?.WalletCredits.ToString("0.##") ?? "0") credits</div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (AvailablePlans.Any())
+    {
+        <div class="plans-grid">
+            @foreach (var plan in AvailablePlans)
+            {
+                var isSub = plan.PlanType == "Subscription";
+                <div class="plan-card">
+                    @if (isSub) { <div class="plan-badge">Best Value</div> }
+                    <div class="plan-type">@(isSub ? "Monthly Subscription" : "One-Time Top-up")</div>
+                    <div class="plan-credits">@plan.Credits <span>Credits</span></div>
+                    
+                    <ul class="plan-features">
+                        <li>Priority AI access</li>
+                        <li>Advanced code analysis</li>
+                        <li>@(isSub ? "Recurring monthly" : "Instant delivery")</li>
+                        <li>No expiration date</li>
+                    </ul>
+
+                    <button class="buy-btn" @onclick="() => BuyPlan(plan)" disabled="@isProcessing">
+                        @(isProcessing ? "Processing..." : (isSub ? "Subscribe Now" : "Buy Credits"))
+                    </button>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="empty-state">
+            <p>Loading available plans...</p>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(creditStatus))
+    {
+        <div class="status-msg @(creditStatus.Contains("✓") || creditStatus.Contains("success") ? "success" : "error")">
+            @creditStatus
+        </div>
+    }
+</div>
+
+@code {
+    private string? creditStatus;
+    private List<StripePlan> AvailablePlans = new();
+    private bool isProcessing = false;
+    private PlanStatusDto? _planStatus;
+    private bool _disposed = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Subscribe to plan and credit change events for real-time sync
+            Session.OnPlanChanged += OnPlanOrCreditsChanged;
+            Session.OnCreditsChanged += OnPlanOrCreditsChanged;
+
+            AvailablePlans = await Http.GetFromJsonAsync<List<StripePlan>>("api/plans") ?? new();
+            await LoadPlanStatus();
+            await CheckStripeSessionAsync();
+        }
+        catch { creditStatus = "❌ Failed to load plans."; }
+    }
+
+    private void OnPlanOrCreditsChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (_disposed) return;
+            await LoadPlanStatus();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadPlanStatus()
+    {
+        var user = Session.GetUser();
+        if (user is not null && user.Id > 0)
+        {
+            try
+            {
+                _planStatus = await Http.GetFromJsonAsync<PlanStatusDto>($"api/plans/status/{user.Id}");
+            }
+            catch { }
+        }
+    }
+
+    private async Task BuyPlan(StripePlan plan)
+    {
+        try
+        {
+            isProcessing = true;
+            var request = new {
+                PriceId = plan.PriceId,
+                Mode = plan.PlanType == "Subscription" ? "subscription" : "payment",
+                SuccessUrl = Navigation.BaseUri + "plans?session_id={CHECKOUT_SESSION_ID}",
+                CancelUrl = Navigation.BaseUri + "plans"
+            };
+
+            var response = await Http.PostAsJsonAsync("api/plans/create-checkout-session", request);
+            if (response.IsSuccessStatusCode)
+            {
+                var stripeSession = await response.Content.ReadFromJsonAsync<StripeSessionDto>();
+                if (stripeSession != null)
+                {
+                    await JS.InvokeVoidAsync("redirectToStripeCheckout", new { sessionId = stripeSession.SessionId });
+                }
+            }
+            else { creditStatus = "❌ Failed to initiate checkout."; }
+        }
+        catch { creditStatus = "❌ Checkout error."; }
+        finally { isProcessing = false; }
+    }
+
+    private async Task CheckStripeSessionAsync()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).TryGetValue("session_id", out var sessionId))
+        {
+            var response = await Http.PostAsync($"api/plans/confirm-payment?sessionId={sessionId}", null);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<UserDto>();
+                if (result != null)
+                {
+                    var user = Session.GetUser();
+                    if (user != null)
+                    {
+                        user.Credits = result.Credits;
+                        await Session.SetUserAsync(user);
+                        creditStatus = "✅ Payment successful! Your credits have been updated.";
+
+                        // Notify other components that plan/credits changed
+                        Session.NotifyPlanChanged();
+                    }
+                }
+            }
+        }
+    }
+
+    public class StripeSessionDto { public string SessionId { get; set; } = ""; }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        Session.OnPlanChanged -= OnPlanOrCreditsChanged;
+        Session.OnCreditsChanged -= OnPlanOrCreditsChanged;
+    }
+}

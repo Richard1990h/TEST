@@ -1,0 +1,1905 @@
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div class="chat-container">
+    @* Pipeline Indicator *@
+    @if (!string.IsNullOrEmpty(ActivePipelineName))
+    {
+        <div class="pipeline-indicator @(pipelineExpanded ? "expanded" : "")">
+            <div class="pipeline-indicator-header" @onclick="TogglePipelineExpanded">
+                <div class="pipeline-indicator-content">
+                    <span class="pipeline-expand-icon">@(pipelineExpanded ? "▼" : "▶")</span>
+                    <span class="pipeline-indicator-icon">&#9881;</span>
+                    <span class="pipeline-indicator-label">Pipeline:</span>
+                    <span class="pipeline-indicator-name">@ActivePipelineName</span>
+                    @if (IsPrimaryPipeline)
+                    {
+                        <span class="pipeline-primary-tag">PRIMARY</span>
+                    }
+                    @if (PipelineErrors.Any())
+                    {
+                        <span class="pipeline-error-badge" title="@PipelineErrors.Count error(s)">@PipelineErrors.Count</span>
+                    }
+                    @if (PipelineWarnings.Any())
+                    {
+                        <span class="pipeline-warning-badge" title="@PipelineWarnings.Count warning(s)">@PipelineWarnings.Count</span>
+                    }
+                </div>
+            </div>
+
+            @* Main Pipeline Errors/Warnings (collapsible) *@
+            @if (pipelineExpanded && (PipelineErrors.Any() || PipelineWarnings.Any()))
+            {
+                <div class="pipeline-messages-box">
+                    @foreach (var error in PipelineErrors)
+                    {
+                        <div class="pipeline-message error">
+                            <span class="message-icon">&#9888;</span>
+                            <span class="message-text">@error</span>
+                        </div>
+                    }
+                    @foreach (var warning in PipelineWarnings)
+                    {
+                        <div class="pipeline-message warning">
+                            <span class="message-icon">&#9888;</span>
+                            <span class="message-text">@warning</span>
+                        </div>
+                    }
+                </div>
+            }
+
+            @* Pipeline Steps *@
+            @if (pipelineExpanded && ActivePipelineSteps.Any())
+            {
+                <div class="pipeline-steps-box">
+                    @foreach (var step in ActivePipelineSteps)
+                    {
+                        <div class="pipeline-step-wrapper">
+                            <div class="pipeline-step-item @(step.IsActive ? "active" : step.IsComplete ? "complete" : "pending") @(step.HasError ? "has-error" : "") @(step.HasWarning ? "has-warning" : "")"
+                                 @onclick="@(() => ToggleStepExpanded(step.Id))">
+                                <span class="step-status-icon">
+                                    @if (step.HasError)
+                                    {
+                                        <span class="step-error-icon">&#10007;</span>
+                                    }
+                                    else if (step.IsActive)
+                                    {
+                                        <span class="step-spinner"></span>
+                                    }
+                                    else if (step.IsComplete)
+                                    {
+                                        <span class="step-check">&#10003;</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="step-dot">&#9679;</span>
+                                    }
+                                </span>
+                                <span class="step-name-full">@step.Name</span>
+                                @if (step.HasError || step.HasWarning)
+                                {
+                                    <span class="step-expand-icon">@(IsStepExpanded(step.Id) ? "▼" : "▶")</span>
+                                }
+                            </div>
+                            @* Step Errors/Warnings (collapsible) *@
+                            @if (IsStepExpanded(step.Id) && (step.Errors.Any() || step.Warnings.Any()))
+                            {
+                                <div class="step-messages-box">
+                                    @foreach (var error in step.Errors)
+                                    {
+                                        <div class="step-message error">
+                                            <span class="msg-icon">&#10007;</span>
+                                            <span>@error</span>
+                                        </div>
+                                    }
+                                    @foreach (var warning in step.Warnings)
+                                    {
+                                        <div class="step-message warning">
+                                            <span class="msg-icon">&#9888;</span>
+                                            <span>@warning</span>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            @* Collapsed summary when not expanded *@
+            @if (!pipelineExpanded && ActivePipelineSteps.Any())
+            {
+                <div class="pipeline-summary">
+                    @{
+                        var activeStep = ActivePipelineSteps.FirstOrDefault(s => s.IsActive);
+                        var completedCount = ActivePipelineSteps.Count(s => s.IsComplete);
+                        var totalCount = ActivePipelineSteps.Count;
+                    }
+                    @if (activeStep != null)
+                    {
+                        <span class="summary-active">
+                            <span class="step-spinner small"></span>
+                            @activeStep.Name
+                        </span>
+                    }
+                    <span class="summary-progress">@completedCount/@totalCount steps</span>
+                </div>
+            }
+        </div>
+    }
+
+    @* Messages Display Area *@
+    <div class="messages-area" @ref="messagesContainer">
+        @if (!messages.Any() && !isStreaming)
+        {
+            <div class="empty-chat">
+                <div class="empty-chat-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+                        <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                        <circle cx="9" cy="9" r="1.5" fill="currentColor"/>
+                        <circle cx="15" cy="9" r="1.5" fill="currentColor"/>
+                    </svg>
+                </div>
+                <h3>Start a conversation</h3>
+                <p>Send a message to begin chatting with the AI assistant</p>
+            </div>
+        }
+        else
+        {
+            @foreach (var message in messages)
+            {
+                <div class="message @(message.Role == "user" ? "user-message" : "assistant-message")">
+                    <div class="message-avatar">
+                        @if (message.Role == "user")
+                        {
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                            </svg>
+                        }
+                        else
+                        {
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                            </svg>
+                        }
+                    </div>
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="message-role">@(message.Role == "user" ? "You" : "Assistant")</span>
+                            <span class="message-time">@message.Timestamp.ToString("HH:mm")</span>
+                        </div>
+                        <div class="message-text">
+                            @if (message.Role == "assistant" && message == messages.LastOrDefault() && isStreaming)
+                            {
+                                <span class="streaming-text">@((MarkupString)FormatMessage(message.Content))</span>
+                                <span class="typing-cursor"></span>
+                            }
+                            else
+                            {
+                                @((MarkupString)FormatMessage(message.Content))
+                            }
+                        </div>
+                        @if (message.Actions?.Any() == true)
+                        {
+                            <div class="message-actions">
+                                @foreach (var action in message.Actions)
+                                {
+                                    <div class="action-item @action.Status.ToString().ToLower()">
+                                        <div class="action-icon">
+                                            @if (action.Status == ActionStatus.Pending)
+                                            {
+                                                <svg class="status-icon pending" viewBox="0 0 24 24" fill="currentColor">
+                                                    <circle cx="12" cy="12" r="8" opacity="0.3"/>
+                                                </svg>
+                                            }
+                                            else if (action.Status == ActionStatus.Running)
+                                            {
+                                                <svg class="status-icon running spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="32">
+                                                        <animate attributeName="stroke-dashoffset" dur="1s" values="32;0" repeatCount="indefinite"/>
+                                                    </circle>
+                                                </svg>
+                                            }
+                                            else if (action.Status == ActionStatus.Complete)
+                                            {
+                                                <svg class="status-icon complete" viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                                                </svg>
+                                            }
+                                            else if (action.Status == ActionStatus.Failed)
+                                            {
+                                                <svg class="status-icon failed" viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
+                                                </svg>
+                                            }
+                                        </div>
+                                        <div class="action-details">
+                                            <span class="action-type">@action.Type</span>
+                                            <span class="action-description">@action.Description</span>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @* Streaming indicator when waiting for response *@
+            @if (isWaitingForResponse && !isStreaming)
+            {
+                <div class="message assistant-message">
+                    <div class="message-avatar">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                        </svg>
+                    </div>
+                    <div class="message-content">
+                        <div class="thinking-indicator">
+                            <span class="thinking-dot"></span>
+                            <span class="thinking-dot"></span>
+                            <span class="thinking-dot"></span>
+                            <span class="thinking-text">@currentStatus</span>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    @* Status Bar - Shows current operation *@
+    @if (!string.IsNullOrEmpty(currentStatus) && (isStreaming || isWaitingForResponse))
+    {
+        <div class="status-bar">
+            <div class="status-indicator">
+                <svg class="spinner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="32">
+                        <animate attributeName="stroke-dashoffset" dur="1s" values="32;0" repeatCount="indefinite"/>
+                    </circle>
+                </svg>
+                <span>@currentStatus</span>
+            </div>
+            @if (isStreaming || isWaitingForResponse)
+            {
+                <button class="stop-btn" @onclick="StopGeneration" title="Stop generation">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="6" y="6" width="12" height="12" rx="2"/>
+                    </svg>
+                    Stop
+                </button>
+            }
+        </div>
+    }
+
+    @* File list showing uploaded files *@
+    @if (uploadedFiles.Any())
+    {
+        <div class="uploaded-files">
+            <div class="files-header">
+                <span>Uploaded Files (@uploadedFiles.Count)</span>
+                <button class="clear-files-btn" @onclick="ClearAllFiles">Clear All</button>
+            </div>
+            <div class="files-list">
+                @foreach (var file in uploadedFiles)
+                {
+                    <div class="file-item">
+                        <svg class="file-icon" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+                        </svg>
+                        <span class="file-name">@file.Name</span>
+                        <button class="remove-file-btn" @onclick="() => RemoveFile(file)">×</button>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @* Main input area *@
+    <div class="chat-input-area">
+        @if (isRecording)
+        {
+            <div class="voice-recording-indicator">
+                <div class="voice-recording-pulse"></div>
+                <span class="voice-recording-text">Recording... @recordingDuration seconds</span>
+                <button class="voice-stop-btn" @onclick="StopRecording">Stop</button>
+            </div>
+        }
+
+        <div class="input-wrapper">
+            @* File Upload Button *@
+            <label class="icon-btn upload-btn" title="Upload File">
+                <InputFile OnChange="HandleFileUpload" multiple style="display:none" />
+                <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+            </label>
+
+            @* Microphone/Voice Button *@
+            <button class="icon-btn voice-btn @(isRecording ? "recording" : "") @(!isSpeechSupported ? "disabled-voice" : "")"
+                    @onclick="ToggleRecording"
+                    title="@(isRecording ? "Stop recording" : (isSpeechSupported ? "Start voice input" : "Voice input not supported"))"
+                    disabled="@(!isSpeechSupported)">
+                <svg class="icon-svg voice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    <line x1="12" y1="19" x2="12" y2="22"/>
+                </svg>
+                <div class="voice-waves">
+                    <span class="wave"></span>
+                    <span class="wave"></span>
+                    <span class="wave"></span>
+                </div>
+            </button>
+
+            @* Text Input *@
+            <textarea class="chat-input"
+                      @ref="textareaRef"
+                      @bind="currentMessage"
+                      @bind:event="oninput"
+                      @bind:after="OnTextareaInput"
+                      @onkeydown="HandleKeyPress" @onkeydown:preventDefault="shouldPreventDefault"
+                      placeholder="Type your message... (Shift+Enter for new line)"
+                      disabled="@(isStreaming || isWaitingForResponse)"
+                      rows="1"></textarea>
+
+            @* Send Button *@
+            <button class="action-btn send-btn"
+                    @onclick="SendMessage"
+                    title="Send"
+                    disabled="@(string.IsNullOrWhiteSpace(currentMessage) && !uploadedFiles.Any() || isStreaming || isWaitingForResponse)">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .chat-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0; /* Critical for flex children to scroll */
+        background: var(--bg-primary, #0f0f1a);
+        overflow: hidden;
+    }
+
+    /* Pipeline Indicator */
+    .pipeline-indicator {
+        flex: 0 0 auto;
+        padding: 0.5rem 1rem;
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%);
+        border-bottom: 1px solid rgba(34, 197, 94, 0.2);
+    }
+
+    .pipeline-indicator-header {
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .pipeline-indicator-header:hover {
+        opacity: 0.9;
+    }
+
+    .pipeline-indicator-content {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.75rem;
+    }
+
+    .pipeline-expand-icon {
+        font-size: 0.6rem;
+        color: var(--text-tertiary, #888);
+        width: 12px;
+    }
+
+    .pipeline-indicator-icon {
+        color: #22c55e;
+        font-size: 0.875rem;
+    }
+
+    .pipeline-indicator-label {
+        color: var(--text-tertiary, #888);
+        font-weight: 600;
+    }
+
+    .pipeline-indicator-name {
+        color: var(--text-primary, #fff);
+        font-weight: 700;
+    }
+
+    .pipeline-primary-tag {
+        padding: 0.125rem 0.375rem;
+        border-radius: 4px;
+        font-size: 0.6rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        background: #22c55e;
+        color: #fff;
+        margin-left: 0.25rem;
+    }
+
+    .pipeline-error-badge, .pipeline-warning-badge {
+        padding: 0.125rem 0.375rem;
+        border-radius: 10px;
+        font-size: 0.6rem;
+        font-weight: 700;
+        min-width: 16px;
+        text-align: center;
+        margin-left: 0.25rem;
+    }
+
+    .pipeline-error-badge {
+        background: #ef4444;
+        color: #fff;
+    }
+
+    .pipeline-warning-badge {
+        background: #f59e0b;
+        color: #fff;
+    }
+
+    /* Pipeline Messages (Errors/Warnings) */
+    .pipeline-messages-box {
+        margin: 0.5rem 0;
+        padding: 0.5rem;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .pipeline-message {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        font-size: 0.75rem;
+        padding: 0.375rem 0.5rem;
+        border-radius: 4px;
+    }
+
+    .pipeline-message.error {
+        background: rgba(239, 68, 68, 0.15);
+        color: #fca5a5;
+        border-left: 2px solid #ef4444;
+    }
+
+    .pipeline-message.warning {
+        background: rgba(245, 158, 11, 0.15);
+        color: #fcd34d;
+        border-left: 2px solid #f59e0b;
+    }
+
+    .pipeline-message .message-icon {
+        flex-shrink: 0;
+    }
+
+    .pipeline-message .message-text {
+        word-break: break-word;
+    }
+
+    /* Pipeline Summary (collapsed state) */
+    .pipeline-summary {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-top: 0.375rem;
+        padding-left: 1.25rem;
+        font-size: 0.7rem;
+    }
+
+    .summary-active {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        color: var(--accent-color, #6366f1);
+        font-weight: 600;
+    }
+
+    .summary-progress {
+        color: var(--text-tertiary, #888);
+    }
+
+    /* Pipeline Steps Box */
+    .pipeline-steps-box {
+        margin-top: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .pipeline-step-wrapper {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .pipeline-step-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.75rem;
+        padding: 0.375rem 0.5rem;
+        color: var(--text-tertiary, #666);
+        transition: all 0.2s ease;
+        border-radius: 4px;
+        cursor: default;
+    }
+
+    .pipeline-step-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .pipeline-step-item.active {
+        color: var(--accent-color, #6366f1);
+        font-weight: 600;
+        background: rgba(99, 102, 241, 0.1);
+    }
+
+    .pipeline-step-item.complete {
+        color: #22c55e;
+    }
+
+    .pipeline-step-item.pending {
+        opacity: 0.5;
+    }
+
+    .pipeline-step-item.has-error {
+        color: #ef4444;
+        background: rgba(239, 68, 68, 0.1);
+        cursor: pointer;
+    }
+
+    .pipeline-step-item.has-warning {
+        color: #f59e0b;
+        cursor: pointer;
+    }
+
+    .step-status-icon {
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .step-spinner {
+        width: 12px;
+        height: 12px;
+        border: 2px solid rgba(99, 102, 241, 0.3);
+        border-top-color: var(--accent-color, #6366f1);
+        border-radius: 50%;
+        animation: stepSpin 0.8s linear infinite;
+    }
+
+    .step-spinner.small {
+        width: 10px;
+        height: 10px;
+        border-width: 1.5px;
+    }
+
+    @@keyframes stepSpin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .step-check {
+        color: #22c55e;
+        font-size: 0.8rem;
+        font-weight: bold;
+    }
+
+    .step-error-icon {
+        color: #ef4444;
+        font-size: 0.8rem;
+        font-weight: bold;
+    }
+
+    .step-dot {
+        font-size: 0.5rem;
+        color: var(--text-tertiary, #666);
+    }
+
+    .step-name-full {
+        flex: 1;
+        white-space: normal;
+        word-break: break-word;
+    }
+
+    .step-expand-icon {
+        font-size: 0.6rem;
+        color: var(--text-tertiary, #888);
+        margin-left: auto;
+        padding-left: 0.5rem;
+    }
+
+    /* Step Messages (Errors/Warnings) */
+    .step-messages-box {
+        margin: 0.25rem 0 0.25rem 1.5rem;
+        padding: 0.375rem 0.5rem;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        border-left: 2px solid var(--border-color, #333);
+    }
+
+    .step-message {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.375rem;
+        font-size: 0.7rem;
+        padding: 0.25rem 0;
+    }
+
+    .step-message.error {
+        color: #fca5a5;
+    }
+
+    .step-message.warning {
+        color: #fcd34d;
+    }
+
+    .step-message .msg-icon {
+        flex-shrink: 0;
+        font-size: 0.65rem;
+    }
+
+    /* Messages Area - MUST scroll, never grow */
+    .messages-area {
+        flex: 1 1 0; /* flex-grow, flex-shrink, flex-basis */
+        min-height: 0; /* Critical for flex children to scroll */
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        scroll-behavior: smooth;
+    }
+
+    .messages-area::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .messages-area::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .messages-area::-webkit-scrollbar-thumb {
+        background: var(--border-color, #333);
+        border-radius: 3px;
+    }
+
+    /* Empty Chat State */
+    .empty-chat {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: var(--text-secondary, #888);
+        padding: 2rem;
+    }
+
+    .empty-chat-icon {
+        width: 80px;
+        height: 80px;
+        margin-bottom: 1.5rem;
+        opacity: 0.5;
+    }
+
+    .empty-chat-icon svg {
+        width: 100%;
+        height: 100%;
+        stroke: var(--accent-color, #6366f1);
+    }
+
+    .empty-chat h3 {
+        color: var(--text-primary, #fff);
+        margin: 0 0 0.5rem 0;
+        font-size: 1.25rem;
+    }
+
+    .empty-chat p {
+        margin: 0;
+        font-size: 0.9rem;
+    }
+
+    /* Message Styles */
+    .message {
+        display: flex;
+        gap: 0.75rem;
+        max-width: 85%;
+        animation: messageSlideIn 0.3s ease-out;
+    }
+
+    @@keyframes messageSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .user-message {
+        align-self: flex-end;
+        flex-direction: row-reverse;
+    }
+
+    .assistant-message {
+        align-self: flex-start;
+    }
+
+    .message-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .user-message .message-avatar {
+        background: var(--accent-color, #6366f1);
+        color: white;
+    }
+
+    .assistant-message .message-avatar {
+        background: var(--bg-tertiary, #1e1e2e);
+        color: var(--accent-color, #6366f1);
+    }
+
+    .message-avatar svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .message-content {
+        background: var(--bg-secondary, #1a1a2e);
+        border-radius: 12px;
+        padding: 0.75rem 1rem;
+        min-width: 60px;
+    }
+
+    .user-message .message-content {
+        background: var(--accent-color, #6366f1);
+        color: white;
+        border-bottom-right-radius: 4px;
+    }
+
+    .assistant-message .message-content {
+        border-bottom-left-radius: 4px;
+    }
+
+    .message-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.25rem;
+        font-size: 0.75rem;
+        opacity: 0.7;
+    }
+
+    .message-role {
+        font-weight: 600;
+    }
+
+    .message-time {
+        font-size: 0.7rem;
+    }
+
+    .message-text {
+        font-size: 0.9rem;
+        line-height: 1.5;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        white-space: pre-wrap;
+        overflow: hidden; /* Prevent content from overflowing */
+    }
+
+    .message-text code {
+        background: rgba(0, 0, 0, 0.2);
+        padding: 0.1rem 0.3rem;
+        border-radius: 3px;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 0.85em;
+        word-break: break-all;
+    }
+
+    .message-text pre {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 0.75rem;
+        border-radius: 6px;
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: 400px; /* Limit code block height */
+        margin: 0.5rem 0;
+        white-space: pre;
+    }
+
+    .message-text pre code {
+        background: none;
+        padding: 0;
+        white-space: pre;
+        word-break: normal;
+    }
+
+    /* Streaming cursor */
+    .typing-cursor {
+        display: inline-block;
+        width: 2px;
+        height: 1em;
+        background: var(--accent-color, #6366f1);
+        margin-left: 2px;
+        animation: blink 1s infinite;
+        vertical-align: text-bottom;
+    }
+
+    @@keyframes blink {
+        0%, 50% { opacity: 1; }
+        51%, 100% { opacity: 0; }
+    }
+
+    /* Thinking Indicator */
+    .thinking-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0;
+    }
+
+    .thinking-dot {
+        width: 8px;
+        height: 8px;
+        background: var(--accent-color, #6366f1);
+        border-radius: 50%;
+        animation: thinking 1.4s infinite ease-in-out both;
+    }
+
+    .thinking-dot:nth-child(1) { animation-delay: -0.32s; }
+    .thinking-dot:nth-child(2) { animation-delay: -0.16s; }
+    .thinking-dot:nth-child(3) { animation-delay: 0s; }
+
+    @@keyframes thinking {
+        0%, 80%, 100% {
+            transform: scale(0.6);
+            opacity: 0.5;
+        }
+        40% {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    .thinking-text {
+        font-size: 0.85rem;
+        color: var(--text-secondary, #888);
+        margin-left: 0.5rem;
+    }
+
+    /* Action Items */
+    .message-actions {
+        margin-top: 0.75rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .action-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 6px;
+        font-size: 0.8rem;
+    }
+
+    .action-icon {
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .status-icon {
+        width: 16px;
+        height: 16px;
+    }
+
+    .status-icon.pending { color: var(--text-secondary, #888); }
+    .status-icon.running { color: var(--accent-color, #6366f1); }
+    .status-icon.complete { color: #22c55e; }
+    .status-icon.failed { color: #ef4444; }
+
+    .status-icon.spinner {
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .action-details {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .action-type {
+        font-weight: 600;
+        color: var(--text-primary, #fff);
+    }
+
+    .action-description {
+        color: var(--text-secondary, #888);
+        font-size: 0.75rem;
+    }
+
+    /* Status Bar */
+    .status-bar {
+        flex-shrink: 0; /* Never shrink */
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5rem 1rem;
+        background: var(--bg-secondary, #1a1a2e);
+        border-top: 1px solid var(--border-color, #333);
+    }
+
+    .status-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--text-secondary, #888);
+        font-size: 0.85rem;
+    }
+
+    .spinner-icon {
+        width: 16px;
+        height: 16px;
+        color: var(--accent-color, #6366f1);
+    }
+
+    .stop-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.25rem 0.75rem;
+        background: #ef4444;
+        border: none;
+        border-radius: 4px;
+        color: white;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .stop-btn:hover {
+        background: #dc2626;
+    }
+
+    .stop-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    /* Uploaded Files Section */
+    .uploaded-files {
+        flex-shrink: 0; /* Never shrink */
+        background: var(--bg-secondary, #1a1a2e);
+        border-top: 1px solid var(--border-color, #333);
+        padding: 0.75rem 1rem;
+    }
+
+    .files-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+        color: var(--text-primary, #fff);
+        font-size: 0.85rem;
+    }
+
+    .clear-files-btn {
+        background: transparent;
+        border: 1px solid var(--border-color, #444);
+        color: var(--text-secondary, #aaa);
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.75rem;
+    }
+
+    .clear-files-btn:hover {
+        background: var(--bg-hover, #333);
+    }
+
+    .files-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .file-item {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        background: var(--bg-tertiary, #0f0f1a);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        color: var(--text-primary, #fff);
+    }
+
+    .file-icon {
+        width: 14px;
+        height: 14px;
+        color: var(--accent-color, #6366f1);
+    }
+
+    .file-name {
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .remove-file-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-secondary, #888);
+        cursor: pointer;
+        padding: 0 0.25rem;
+        font-size: 1rem;
+        line-height: 1;
+    }
+
+    .remove-file-btn:hover {
+        color: #ef4444;
+    }
+
+    /* Chat Input Area - MUST stay at bottom, never shrink */
+    .chat-input-area {
+        flex-shrink: 0; /* Never shrink */
+        padding: 0.75rem 1rem 1rem;
+        background: var(--bg-primary, #0f0f1a);
+        border-top: 1px solid var(--border-color, #333);
+    }
+
+    .voice-recording-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.5rem;
+        background: rgba(239, 68, 68, 0.1);
+        border-radius: 8px;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .voice-recording-pulse {
+        width: 12px;
+        height: 12px;
+        background: #ef4444;
+        border-radius: 50%;
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .voice-recording-text {
+        color: #ef4444;
+        font-size: 0.85rem;
+    }
+
+    .voice-stop-btn {
+        margin-left: auto;
+        padding: 0.25rem 0.75rem;
+        background: #ef4444;
+        border: none;
+        border-radius: 4px;
+        color: white;
+        cursor: pointer;
+        font-size: 0.8rem;
+    }
+
+    .input-wrapper {
+        display: flex;
+        align-items: flex-end;
+        gap: 0.5rem;
+        background: var(--bg-secondary, #1a1a2e);
+        border-radius: 12px;
+        padding: 0.5rem;
+        border: 1px solid var(--border-color, #333);
+        transition: border-color 0.2s;
+    }
+
+    .input-wrapper:focus-within {
+        border-color: var(--accent-color, #6366f1);
+    }
+
+    .icon-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        background: var(--bg-tertiary, #252540);
+        border: 1px solid var(--border-color, #333);
+        border-radius: 8px;
+        color: var(--text-secondary, #888);
+        cursor: pointer;
+        transition: all 0.2s;
+        flex-shrink: 0;
+    }
+
+    .icon-btn:hover {
+        background: var(--bg-hover, #252540);
+        color: var(--text-primary, #fff);
+    }
+
+    .icon-svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .voice-btn.recording {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+    }
+
+    .voice-btn.disabled-voice {
+        opacity: 0.7;
+        cursor: not-allowed;
+        background: var(--bg-tertiary, #1a1a2e);
+    }
+
+    .voice-btn.disabled-voice:hover {
+        background: var(--bg-tertiary, #1a1a2e);
+        color: var(--text-secondary, #888);
+    }
+
+    .voice-waves {
+        display: none;
+    }
+
+    .voice-btn.recording .voice-icon {
+        display: none;
+    }
+
+    .voice-btn.recording .voice-waves {
+        display: flex;
+        gap: 2px;
+        align-items: center;
+        height: 20px;
+    }
+
+    .wave {
+        width: 3px;
+        height: 10px;
+        background: #ef4444;
+        border-radius: 2px;
+        animation: wave 0.5s ease-in-out infinite;
+    }
+
+    .wave:nth-child(2) { animation-delay: 0.1s; }
+    .wave:nth-child(3) { animation-delay: 0.2s; }
+
+    .chat-input {
+        flex: 1;
+        background: transparent;
+        border: none;
+        color: var(--text-primary, #fff);
+        font-size: 0.95rem;
+        padding: 0.5rem;
+        resize: none;
+        min-height: 24px;
+        max-height: 150px;
+        outline: none;
+        font-family: inherit;
+        line-height: 1.4;
+    }
+
+    .chat-input::placeholder {
+        color: var(--text-secondary, #666);
+    }
+
+    .chat-input:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .action-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        background: var(--accent-color, #6366f1);
+        border: none;
+        border-radius: 8px;
+        color: white;
+        cursor: pointer;
+        transition: all 0.2s;
+        flex-shrink: 0;
+    }
+
+    .action-btn:hover:not(:disabled) {
+        background: var(--accent-hover, #4f46e5);
+        transform: scale(1.05);
+    }
+
+    .action-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .action-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.7; transform: scale(1.1); }
+    }
+
+    @@keyframes wave {
+        0%, 100% { height: 10px; }
+        50% { height: 20px; }
+    }
+</style>
+
+@code {
+    // ===== PARAMETERS =====
+    [Parameter] public EventCallback<MessagePayload> OnMessageSent { get; set; }
+    [Parameter] public EventCallback OnStopRequested { get; set; }
+    [Parameter] public string? ActivePipelineName { get; set; }
+    [Parameter] public bool IsPrimaryPipeline { get; set; } = true;
+    [Parameter] public List<PipelineStepInfo> ActivePipelineSteps { get; set; } = new();
+    [Parameter] public List<string> PipelineErrors { get; set; } = new();
+    [Parameter] public List<string> PipelineWarnings { get; set; } = new();
+
+    // ===== STATE =====
+    private string currentMessage = "";
+    private List<FileContent> uploadedFiles = new();
+    private List<ChatMessage> messages = new();
+    private ElementReference textareaRef;
+    private ElementReference messagesContainer;
+    private bool shouldPreventDefault = false;
+    private bool isStreaming = false;
+    private bool isWaitingForResponse = false;
+    private string currentStatus = "Thinking...";
+
+    // Pipeline UI state
+    private bool pipelineExpanded = true;
+    private HashSet<string> expandedSteps = new();
+
+    // Voice recording
+    private bool isRecording = false;
+    private bool isSpeechSupported = false;
+    private int recordingDuration = 0;
+    private DotNetObjectReference<ChatArea>? dotNetRef;
+    private System.Threading.Timer? recordingTimer;
+
+    // ===== LIFECYCLE =====
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotNetRef = DotNetObjectReference.Create(this);
+
+            try
+            {
+                isSpeechSupported = await JS.InvokeAsync<bool>("isSpeechRecognitionSupported");
+            }
+            catch
+            {
+                isSpeechSupported = false;
+            }
+
+            StateHasChanged();
+        }
+    }
+
+    // ===== PUBLIC METHODS FOR EXTERNAL CONTROL =====
+
+    /// <summary>
+    /// Add a user message to the chat
+    /// </summary>
+    public void AddUserMessage(string content)
+    {
+        messages.Add(new ChatMessage
+        {
+            Role = "user",
+            Content = content,
+            Timestamp = DateTime.Now
+        });
+        isWaitingForResponse = true;
+        currentStatus = "Thinking...";
+        StateHasChanged();
+        _ = ScrollToBottom();
+    }
+
+    /// <summary>
+    /// Start streaming an assistant response
+    /// </summary>
+    public void StartAssistantResponse()
+    {
+        messages.Add(new ChatMessage
+        {
+            Role = "assistant",
+            Content = "",
+            Timestamp = DateTime.Now
+        });
+        isWaitingForResponse = false;
+        isStreaming = true;
+        currentStatus = "Generating response...";
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Append content to the current streaming response
+    /// </summary>
+    public void AppendToResponse(string token)
+    {
+        var lastMessage = messages.LastOrDefault();
+        if (lastMessage != null && lastMessage.Role == "assistant")
+        {
+            lastMessage.Content += token;
+            StateHasChanged();
+            _ = ScrollToBottom();
+        }
+    }
+
+    /// <summary>
+    /// Update the status message
+    /// </summary>
+    public void UpdateStatus(string status)
+    {
+        currentStatus = status;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Add an action to the current message
+    /// </summary>
+    public void AddAction(string type, string description, ActionStatus status = ActionStatus.Running)
+    {
+        var lastMessage = messages.LastOrDefault();
+        if (lastMessage != null && lastMessage.Role == "assistant")
+        {
+            lastMessage.Actions ??= new List<MessageAction>();
+            lastMessage.Actions.Add(new MessageAction
+            {
+                Type = type,
+                Description = description,
+                Status = status
+            });
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Update the status of an action
+    /// </summary>
+    public void UpdateActionStatus(string type, ActionStatus status)
+    {
+        var lastMessage = messages.LastOrDefault();
+        var action = lastMessage?.Actions?.FirstOrDefault(a => a.Type == type);
+        if (action != null)
+        {
+            action.Status = status;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Complete the current response
+    /// </summary>
+    public void CompleteResponse()
+    {
+        isStreaming = false;
+        isWaitingForResponse = false;
+        currentStatus = "";
+        StateHasChanged();
+        _ = ScrollToBottom();
+    }
+
+    /// <summary>
+    /// Show an error message
+    /// </summary>
+    public void ShowError(string error)
+    {
+        var lastMessage = messages.LastOrDefault();
+        if (lastMessage != null && lastMessage.Role == "assistant" && string.IsNullOrEmpty(lastMessage.Content))
+        {
+            lastMessage.Content = $"⚠️ Error: {error}";
+        }
+        else
+        {
+            messages.Add(new ChatMessage
+            {
+                Role = "assistant",
+                Content = $"⚠️ Error: {error}",
+                Timestamp = DateTime.Now
+            });
+        }
+        isStreaming = false;
+        isWaitingForResponse = false;
+        currentStatus = "";
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Clear all messages
+    /// </summary>
+    public void ClearMessages()
+    {
+        messages.Clear();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Set a step as active (currently executing)
+    /// </summary>
+    public void SetActiveStep(string stepId)
+    {
+        foreach (var step in ActivePipelineSteps)
+        {
+            step.IsActive = step.Id == stepId;
+        }
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Mark a step as complete
+    /// </summary>
+    public void CompleteStep(string stepId)
+    {
+        var step = ActivePipelineSteps.FirstOrDefault(s => s.Id == stepId);
+        if (step != null)
+        {
+            step.IsActive = false;
+            step.IsComplete = true;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Reset all pipeline steps to pending state
+    /// </summary>
+    public void ResetPipelineSteps()
+    {
+        foreach (var step in ActivePipelineSteps)
+        {
+            step.IsActive = false;
+            step.IsComplete = false;
+        }
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Update the pipeline steps list
+    /// </summary>
+    public void SetPipelineSteps(List<PipelineStepInfo> steps)
+    {
+        ActivePipelineSteps = steps;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Add an error to a specific pipeline step
+    /// </summary>
+    public void AddStepError(string stepId, string error)
+    {
+        var step = ActivePipelineSteps.FirstOrDefault(s => s.Id == stepId);
+        if (step != null)
+        {
+            step.Errors.Add(error);
+            expandedSteps.Add(stepId); // Auto-expand step with error
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Add a warning to a specific pipeline step
+    /// </summary>
+    public void AddStepWarning(string stepId, string warning)
+    {
+        var step = ActivePipelineSteps.FirstOrDefault(s => s.Id == stepId);
+        if (step != null)
+        {
+            step.Warnings.Add(warning);
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Add a general pipeline error
+    /// </summary>
+    public void AddPipelineError(string error)
+    {
+        PipelineErrors.Add(error);
+        pipelineExpanded = true; // Auto-expand on error
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Add a general pipeline warning
+    /// </summary>
+    public void AddPipelineWarning(string warning)
+    {
+        PipelineWarnings.Add(warning);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Clear all pipeline errors and warnings
+    /// </summary>
+    public void ClearPipelineMessages()
+    {
+        PipelineErrors.Clear();
+        PipelineWarnings.Clear();
+        foreach (var step in ActivePipelineSteps)
+        {
+            step.Errors.Clear();
+            step.Warnings.Clear();
+        }
+        expandedSteps.Clear();
+        StateHasChanged();
+    }
+
+    // ===== PIPELINE UI METHODS =====
+
+    private void TogglePipelineExpanded()
+    {
+        pipelineExpanded = !pipelineExpanded;
+    }
+
+    private void ToggleStepExpanded(string stepId)
+    {
+        if (expandedSteps.Contains(stepId))
+            expandedSteps.Remove(stepId);
+        else
+            expandedSteps.Add(stepId);
+    }
+
+    private bool IsStepExpanded(string stepId)
+    {
+        return expandedSteps.Contains(stepId);
+    }
+
+    // ===== PRIVATE METHODS =====
+
+    private async Task ScrollToBottom()
+    {
+        try
+        {
+            await Task.Delay(50); // Small delay to allow DOM update
+            await JS.InvokeVoidAsync("scrollToBottom", messagesContainer);
+        }
+        catch { }
+    }
+
+    private string FormatMessage(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return "";
+
+        // Basic markdown-like formatting
+        var formatted = System.Web.HttpUtility.HtmlEncode(content);
+
+        // Code blocks
+        formatted = System.Text.RegularExpressions.Regex.Replace(
+            formatted,
+            @"```(\w*)\n?([\s\S]*?)```",
+            "<pre><code>$2</code></pre>"
+        );
+
+        // Inline code
+        formatted = System.Text.RegularExpressions.Regex.Replace(
+            formatted,
+            @"`([^`]+)`",
+            "<code>$1</code>"
+        );
+
+        // Bold
+        formatted = System.Text.RegularExpressions.Regex.Replace(
+            formatted,
+            @"\*\*([^*]+)\*\*",
+            "<strong>$1</strong>"
+        );
+
+        // Newlines
+        formatted = formatted.Replace("\n", "<br/>");
+
+        return formatted;
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(currentMessage) && !uploadedFiles.Any())
+            return;
+
+        if (isStreaming || isWaitingForResponse)
+            return;
+
+        var payload = new MessagePayload
+        {
+            Message = currentMessage,
+            Files = uploadedFiles.ToList()
+        };
+
+        // Add user message to display
+        AddUserMessage(currentMessage);
+
+        // Clear input
+        currentMessage = "";
+        uploadedFiles.Clear();
+
+        // Fire event for parent to handle
+        await OnMessageSent.InvokeAsync(payload);
+
+        // Reset textarea height
+        try
+        {
+            await JS.InvokeVoidAsync("autoResizeTextarea", textareaRef);
+        }
+        catch { }
+    }
+
+    private async Task StopGeneration()
+    {
+        await OnStopRequested.InvokeAsync();
+        isStreaming = false;
+        isWaitingForResponse = false;
+        currentStatus = "";
+
+        var lastMessage = messages.LastOrDefault();
+        if (lastMessage != null && lastMessage.Role == "assistant")
+        {
+            lastMessage.Content += "\n\n[Generation stopped]";
+        }
+
+        StateHasChanged();
+    }
+
+    // ===== KEYBOARD HANDLING =====
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            shouldPreventDefault = true;
+            await SendMessage();
+        }
+        else
+        {
+            shouldPreventDefault = false;
+        }
+    }
+
+    private async Task OnTextareaInput()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("autoResizeTextarea", textareaRef);
+        }
+        catch { }
+    }
+
+    // ===== FILE UPLOAD =====
+    private async Task HandleFileUpload(InputFileChangeEventArgs e)
+    {
+        foreach (var file in e.GetMultipleFiles(10))
+        {
+            try
+            {
+                using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                using var reader = new StreamReader(stream);
+                var content = await reader.ReadToEndAsync();
+
+                uploadedFiles.Add(new FileContent
+                {
+                    Name = file.Name,
+                    Content = content
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error reading file {file.Name}: {ex.Message}");
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private void RemoveFile(FileContent file)
+    {
+        uploadedFiles.Remove(file);
+        StateHasChanged();
+    }
+
+    private void ClearAllFiles()
+    {
+        uploadedFiles.Clear();
+        StateHasChanged();
+    }
+
+    // ===== VOICE RECORDING =====
+    private async Task ToggleRecording()
+    {
+        if (isRecording)
+        {
+            await StopRecording();
+        }
+        else
+        {
+            await StartRecording();
+        }
+    }
+
+    private async Task StartRecording()
+    {
+        if (!isSpeechSupported || dotNetRef == null) return;
+
+        try
+        {
+            var started = await JS.InvokeAsync<bool>("startSpeechRecognition", dotNetRef);
+            if (started)
+            {
+                isRecording = true;
+                recordingDuration = 0;
+                recordingTimer = new System.Threading.Timer(_ =>
+                {
+                    recordingDuration++;
+                    InvokeAsync(StateHasChanged);
+                }, null, 1000, 1000);
+            }
+        }
+        catch { }
+    }
+
+    private async Task StopRecording()
+    {
+        recordingTimer?.Dispose();
+        recordingTimer = null;
+        isRecording = false;
+
+        try
+        {
+            await JS.InvokeVoidAsync("stopSpeechRecognition");
+        }
+        catch { }
+
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnSpeechResult(string transcript)
+    {
+        if (!string.IsNullOrWhiteSpace(transcript))
+        {
+            currentMessage += (string.IsNullOrEmpty(currentMessage) ? "" : " ") + transcript;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    [JSInvokable]
+    public void OnSpeechEnd()
+    {
+        isRecording = false;
+        recordingTimer?.Dispose();
+        recordingTimer = null;
+        InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public void OnSpeechStatusChanged(string status, string? error)
+    {
+        if (status == "started")
+        {
+            isRecording = true;
+        }
+        else if (status == "ended" || status == "error")
+        {
+            isRecording = false;
+            recordingTimer?.Dispose();
+            recordingTimer = null;
+        }
+        InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public void OnTranscriptUpdate(string transcript)
+    {
+        if (!string.IsNullOrWhiteSpace(transcript))
+        {
+            currentMessage = transcript;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    [JSInvokable]
+    public void OnFinalTranscript(string transcript)
+    {
+        if (!string.IsNullOrWhiteSpace(transcript))
+        {
+            currentMessage = transcript;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    // ===== MODELS =====
+    public class FileContent
+    {
+        public string Name { get; set; } = "";
+        public string Content { get; set; } = "";
+    }
+
+    public class MessagePayload
+    {
+        public string Message { get; set; } = "";
+        public List<FileContent> Files { get; set; } = new();
+    }
+
+    public class ChatMessage
+    {
+        public string Role { get; set; } = "";
+        public string Content { get; set; } = "";
+        public DateTime Timestamp { get; set; }
+        public List<MessageAction>? Actions { get; set; }
+    }
+
+    public class MessageAction
+    {
+        public string Type { get; set; } = "";
+        public string Description { get; set; } = "";
+        public ActionStatus Status { get; set; } = ActionStatus.Pending;
+    }
+
+    public enum ActionStatus
+    {
+        Pending,
+        Running,
+        Complete,
+        Failed
+    }
+
+    public class PipelineStepInfo
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public bool IsActive { get; set; }
+        public bool IsComplete { get; set; }
+        public List<string> Errors { get; set; } = new();
+        public List<string> Warnings { get; set; } = new();
+        public bool HasError => Errors.Any();
+        public bool HasWarning => Warnings.Any();
+    }
+
+    public void Dispose()
+    {
+        recordingTimer?.Dispose();
+        dotNetRef?.Dispose();
+    }
+}

@@ -1,0 +1,59 @@
+{
+  "utc": "2026-01-14T20:03:44.2014444Z",
+  "stripePlans": [
+    {
+      "Id": 1,
+      "Credits": 5,
+      "PriceId": "price_1RIYbXEpmkCkAObm52w7M8Zd",
+      "PlanType": "Subscription"
+    },
+    {
+      "Id": 2,
+      "Credits": 20,
+      "PriceId": "price_1RIYfOEpmkCkAObmM3vbxnCZ",
+      "PlanType": "Subscription"
+    },
+    {
+      "Id": 3,
+      "Credits": 100,
+      "PriceId": "price_1RIZ79EpmkCkAObmKCSybNiD",
+      "PlanType": "Subscription"
+    },
+    {
+      "Id": 4,
+      "Credits": 100,
+      "PriceId": "price_1RIYZiEpmkCkAObm8ygWlS6Z",
+      "PlanType": "OneTime"
+    },
+    {
+      "Id": 5,
+      "Credits": 20,
+      "PriceId": "price_1RIYZBEpmkCkAObmcl7FyeSj",
+      "PlanType": "OneTime"
+    },
+    {
+      "Id": 6,
+      "Credits": 5,
+      "PriceId": "price_1RIYYaEpmkCkAObmePHSLWlI",
+      "PlanType": "OneTime"
+    }
+  ],
+  "stripePlanPolicies": [],
+  "userStripeSubscriptions": [],
+  "userDailyCreditState": [
+    {
+      "UserId": 1,
+      "UtcDay": "2026-01-14T00:00:00",
+      "DailyAllowance": 50,
+      "DailyRemaining": 0,
+      "UpdatedAt": "2026-01-14T12:50:32"
+    },
+    {
+      "UserId": 2,
+      "UtcDay": "2026-01-14T00:00:00",
+      "DailyAllowance": 50,
+      "DailyRemaining": 0,
+      "UpdatedAt": "2026-01-14T09:49:34"
+    }
+  ]
+}

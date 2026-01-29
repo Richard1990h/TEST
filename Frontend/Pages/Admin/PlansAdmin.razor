@@ -1,0 +1,286 @@
+@inject HttpClient Http
+@inject IJSRuntime JS
+@using LittleHelperAI.Shared.Models
+
+<div class="admin-grid">
+    <div class="admin-card admin-card-wide">
+        <div class="admin-card-title">Stripe Plans</div>
+        <div class="admin-card-sub">Manage pricing tiers and credits allocation.</div>
+
+        @if (_loading)
+        {
+            <div class="admin-muted" style="margin-top:12px;">Loading plans...</div>
+        }
+        else if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="admin-error">@_error</div>
+        }
+        else
+        {
+            <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
+                <button class="admin-btn admin-btn-primary" @onclick="NewPlan">New Plan</button>
+                <button class="admin-btn" @onclick="Refresh">↻ Refresh</button>
+            </div>
+
+            <div class="admin-table-wrap" style="margin-top:12px;">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th style="width:60px;">Id</th>
+                            <th>Price ID</th>
+                            <th style="width:130px;">Type</th>
+                            <th style="width:100px;">Credits</th>
+                            <th style="width:180px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in _plans)
+                        {
+                            <tr>
+                                <td>@p.Id</td>
+                                <td style="max-width:220px; overflow:hidden; text-overflow:ellipsis;" title="@p.PriceId">@p.PriceId</td>
+                                <td><span class="pill @PlanTypePillClass(p.PlanType)">@PlanTypeIcon(p.PlanType) @p.PlanType</span></td>
+                                <td><strong>@p.Credits</strong></td>
+                                <td>
+                                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                        <button class="admin-btn admin-btn-xs admin-btn-primary" @onclick="(() => EditPlan(p))" title="Edit plan">Edit</button>
+                                        <button class="admin-btn admin-btn-xs admin-btn-danger" @onclick="(() => DeletePlan(p))" title="Delete plan">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (_editingPlan != null)
+            {
+                <div style="margin-top:20px; padding:18px; border:1px solid rgba(59, 130, 246, 0.3); border-radius:14px; background:linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05));">
+                    <div class="admin-card-title" style="margin-bottom:12px;">@( _editingPlan.Id == 0 ? "Create New Plan" : "Edit Plan" )</div>
+                    <div class="admin-form-grid">
+                        <div class="admin-form-field">
+                            <label>Price ID</label>
+                            <input @bind="_editingPlan.PriceId" placeholder="price_xxx" />
+                        </div>
+                        <div class="admin-form-field">
+                            <label>Plan Type</label>
+                            <input @bind="_editingPlan.PlanType" placeholder="Subscription" />
+                        </div>
+                        <div class="admin-form-field">
+                            <label>Credits</label>
+                            <input type="number" step="0.01" @bind="_editingPlan.Credits" />
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:10px; margin-top:12px;">
+                        <button class="admin-btn admin-btn-primary" @onclick="SavePlan">Save</button>
+                        <button class="admin-btn" @onclick="CancelPlan">Cancel</button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    <div class="admin-card">
+        <div class="admin-card-title">Policy Editor</div>
+        <div class="admin-card-sub">Configure plan behavior and daily credits.</div>
+
+        <div class="admin-form-field" style="margin-top:12px;">
+            <label>Select Plan</label>
+            <select value="@_policy.PlanId" @onchange="OnPolicyPlanChanged">
+                <option value="0">-- Select Plan --</option>
+                @foreach (var p in _plans)
+                {
+                    <option value="@p.Id">@p.Id - @p.PriceId</option>
+                }
+            </select>
+        </div>
+
+        @if (_policy.PlanId > 0)
+        {
+            <div class="admin-form-field" style="margin-top:12px;">
+                <label>Plan Name (shown to user)</label>
+                <input @bind="_policy.PlanName" placeholder="e.g., Pro" />
+            </div>
+
+            <div style="display:flex; align-items:center; gap:10px; margin-top:12px;">
+                <input type="checkbox" @bind="_policy.IsUnlimited" style="width:auto;" />
+                <label style="margin:0;">Unlimited usage</label>
+            </div>
+
+            <div class="admin-form-field" style="margin-top:12px;">
+                <label>Daily Credits (optional)</label>
+                <input type="number" step="0.01" @bind="_policy.DailyCredits" />
+            </div>
+
+            <div style="display:flex; gap:10px; margin-top:12px;">
+                <button class="admin-btn admin-btn-primary" @onclick="SavePolicy">Save Policy</button>
+            </div>
+        }
+
+        <div class="admin-muted" style="margin-top:16px; line-height:1.6;">
+            Policies drive what users see in PlanStatusBar and profile. Unlimited plans don't deduct wallet credits.
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _loading;
+    private string? _error;
+    private List<StripePlan> _plans = new();
+    private List<StripePlanPolicy> _policies = new();
+
+    private StripePlan? _editingPlan;
+    private StripePlanPolicy _policy = new() { PlanId = 0, PlanName = "", IsUnlimited = false, DailyCredits = 0 };
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    public async Task Refresh() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var res = await Http.GetFromJsonAsync<PlansAdminResponse>("api/admin/plans");
+            _plans = res?.Plans ?? new();
+            _policies = res?.Policies ?? new();
+
+            if (_policy.PlanId > 0)
+                ApplyExistingPolicyToEditor(_policy.PlanId);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void NewPlan() => _editingPlan = new StripePlan { Id = 0, PriceId = "", PlanType = "Subscription", Credits = 0 };
+
+    private void EditPlan(StripePlan p)
+    {
+        _editingPlan = new StripePlan { Id = p.Id, PriceId = p.PriceId, PlanType = p.PlanType, Credits = p.Credits };
+        if (_policy.PlanId != p.Id)
+        {
+            _policy.PlanId = p.Id;
+            ApplyExistingPolicyToEditor(p.Id);
+        }
+    }
+
+    private void CancelPlan() => _editingPlan = null;
+
+    private async Task SavePlan()
+    {
+        if (_editingPlan == null) return;
+        var resp = await Http.PostAsJsonAsync("api/admin/plans/upsert-plan", _editingPlan);
+        if (!resp.IsSuccessStatusCode)
+        {
+            _error = await resp.Content.ReadAsStringAsync();
+            return;
+        }
+        _editingPlan = null;
+        await LoadAsync();
+    }
+
+    private async Task DeletePlan(StripePlan p)
+    {
+        var ok = await JS.InvokeAsync<bool>("confirm", $"Delete plan {p.Id}? This also deletes its policy.");
+        if (!ok) return;
+
+        var resp = await Http.DeleteAsync($"api/admin/plans/{p.Id}");
+        if (!resp.IsSuccessStatusCode)
+        {
+            _error = await resp.Content.ReadAsStringAsync();
+            return;
+        }
+        await LoadAsync();
+    }
+
+    private void OnPolicyPlanChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var id))
+        {
+            _policy.PlanId = id;
+            ApplyExistingPolicyToEditor(id);
+        }
+    }
+
+    private void ApplyExistingPolicyToEditor(int planId)
+    {
+        var existing = _policies.FirstOrDefault(x => x.PlanId == planId);
+        if (existing == null)
+        {
+            _policy.PlanId = planId;
+            _policy.PlanName = "";
+            _policy.IsUnlimited = false;
+            _policy.DailyCredits = 0;
+            return;
+        }
+
+        _policy.PlanId = existing.PlanId;
+        _policy.PlanName = existing.PlanName;
+        _policy.IsUnlimited = existing.IsUnlimited;
+        _policy.DailyCredits = existing.DailyCredits;
+    }
+
+    private async Task SavePolicy()
+    {
+        if (_policy.PlanId <= 0)
+        {
+            _error = "Select a Plan first.";
+            return;
+        }
+
+        var resp = await Http.PostAsJsonAsync("api/admin/plans/upsert-policy", _policy);
+        if (!resp.IsSuccessStatusCode)
+        {
+            _error = await resp.Content.ReadAsStringAsync();
+            return;
+        }
+        await LoadAsync();
+    }
+
+    private string PlanTypePillClass(string planType)
+    {
+        return planType?.ToLower() switch
+        {
+            "subscription" => "pill-sub",
+            "onetime" => "pill-onetime",
+            _ => ""
+        };
+    }
+
+    private string PlanTypeIcon(string planType)
+    {
+        return planType?.ToLower() switch
+        {
+            "subscription" => "🔄",
+            "onetime" => "💵",
+            _ => "💳"
+        };
+    }
+
+    private sealed class PlansAdminResponse
+    {
+        public List<StripePlan>? Plans { get; set; }
+        public List<StripePlanPolicy>? Policies { get; set; }
+    }
+}
+
+<style>
+    .pill-sub {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15)) !important;
+        color: var(--primary-500) !important;
+        border-color: rgba(59, 130, 246, 0.3) !important;
+    }
+
+    .pill-onetime {
+        background: rgba(16, 185, 129, 0.15) !important;
+        color: #10b981 !important;
+        border-color: rgba(16, 185, 129, 0.3) !important;
+    }
+</style>

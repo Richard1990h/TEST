@@ -1,0 +1,320 @@
+// ============================================
+// Enhanced Site.js for Little Helper AI
+// Intelligent assistant functionality
+// ============================================
+
+window.dispatchChatMessage = function (filename, code) {
+    const chatBox = document.querySelector('.chat-box');
+    if (!chatBox) return;
+
+    const message = document.createElement('div');
+    message.className = 'chat-message bot';
+    message.innerHTML = `<strong>🛠 Fixed ${filename}</strong><pre>${code}</pre>`;
+    chatBox.appendChild(message);
+
+    setTimeout(() => chatBox.scrollTop = chatBox.scrollHeight, 50);
+};
+
+// ✅ Blazor helper: scroll a referenced element to the bottom
+window.scrollToBottom = function (element) {
+    try {
+        if (!element) return;
+        element.scrollTop = element.scrollHeight;
+    } catch {
+        // no-op
+    }
+};
+
+// ✅ Enhanced Markdown Rendering with Better Code Handling
+window.renderMarkdown = function (text) {
+    if (!text) return "";
+    if (typeof marked === 'undefined') {
+        console.warn("Marked library not loaded");
+        return escapeHtml(text);
+    }
+    
+    try {
+        const renderer = new marked.Renderer();
+        
+        // Enhanced code block rendering with copy button and language badge
+        renderer.code = function(code, language) {
+            const langDisplay = language || 'text';
+            const langClass = language || '';
+            const escapedCode = escapeHtml(code);
+            
+            let highlighted = escapedCode;
+            if (typeof hljs !== 'undefined' && language && hljs.getLanguage(language)) {
+                try {
+                    highlighted = hljs.highlight(code, { language }).value;
+                } catch (e) {
+                    console.error("Highlight.js error:", e);
+                }
+            }
+            
+            const codeId = 'code-' + Math.random().toString(36).substr(2, 9);
+            
+            return `
+                <div class="code-block-wrapper">
+                    <div class="code-block-header">
+                        <span class="code-language-badge">${langDisplay}</span>
+                        <button class="code-copy-btn" onclick="copyCodeToClipboard('${codeId}')" title="Copy code">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            <span class="copy-text">Copy</span>
+                        </button>
+                    </div>
+                    <pre class="code-block"><code id="${codeId}" class="hljs language-${langClass}">${highlighted}</code></pre>
+                </div>
+            `;
+        };
+
+        // Enhanced inline code rendering
+        renderer.codespan = function(code) {
+            return `<code class="inline-code">${escapeHtml(code)}</code>`;
+        };
+
+        // Enhanced link rendering (open in new tab)
+        renderer.link = function(href, title, text) {
+            const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
+            return `<a href="${escapeHtml(href)}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
+        };
+
+        marked.setOptions({
+            renderer: renderer,
+            breaks: true,
+            gfm: true,
+            headerIds: false,
+            mangle: false
+        });
+
+        return marked.parse(text);
+    } catch (e) {
+        console.error("Markdown parsing error:", e);
+        return escapeHtml(text);
+    }
+};
+
+// ✅ Copy Code to Clipboard with Feedback
+window.copyCodeToClipboard = async function(codeId) {
+    try {
+        const codeElement = document.getElementById(codeId);
+        if (!codeElement) return;
+        
+        const code = codeElement.textContent;
+        await navigator.clipboard.writeText(code);
+        
+        // Visual feedback
+        const button = codeElement.closest('.code-block-wrapper').querySelector('.code-copy-btn');
+        if (button) {
+            const originalHTML = button.innerHTML;
+            button.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span class="copy-text">Copied!</span>
+            `;
+            button.classList.add('copied');
+            
+            setTimeout(() => {
+                button.innerHTML = originalHTML;
+                button.classList.remove('copied');
+            }, 2000);
+        }
+    } catch (err) {
+        console.error('Failed to copy code:', err);
+    }
+};
+
+// ✅ Apply Syntax Highlighting to All Code Blocks
+window.applyHighlighting = function () {
+    if (typeof hljs !== 'undefined') {
+        document.querySelectorAll('pre code:not(.hljs)').forEach((block) => {
+            hljs.highlightElement(block);
+        });
+    }
+};
+
+// ✅ Escape HTML to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ✅ Auto-resize textarea as user types
+window.autoResizeTextarea = function(textarea) {
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+};
+
+// ✅ Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Apply highlighting to any existing code blocks
+    applyHighlighting();
+    
+    // Setup auto-resize for textareas
+    const textareas = document.querySelectorAll('.chat-input');
+    textareas.forEach(textarea => {
+        textarea.addEventListener('input', function() {
+            autoResizeTextarea(this);
+        });
+    });
+});
+
+// ✅ Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    // Ctrl/Cmd + K: Clear chat (if implemented)
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        const clearButton = document.querySelector('.clear-chat-btn');
+        if (clearButton) clearButton.click();
+    }
+
+    // ===============================
+    // 🎨 GLOBAL THEME HANDLER (REQUIRED)
+    // ===============================
+    window.setTheme = function (theme) {
+        if (!theme) theme = "light";
+        document.documentElement.setAttribute("data-theme", theme);
+    };
+
+
+
+
+
+    // Escape: Stop generating (if implemented)
+    if (e.key === 'Escape') {
+        const stopButton = document.querySelector('.stop-generating-btn');
+        if (stopButton && stopButton.style.display !== 'none') {
+            stopButton.click();
+        }
+    }
+});
+
+
+// ✅ Copy arbitrary text (used by Code Fix bubbles)
+window.copyTextRaw = async function(text) {
+    try {
+        await navigator.clipboard.writeText(text || "");
+        return true;
+    } catch (e) {
+        console.error("copyTextRaw failed", e);
+        return false;
+    }
+};
+
+// ✅ Download arbitrary text as a file
+window.downloadTextFile = function(filename, content) {
+    try {
+        const safeName = filename || "download.txt";
+        const blob = new Blob([content || ""], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = safeName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        console.error("downloadTextFile failed", e);
+    }
+};
+
+
+/**
+ * Typewriter effect - fetches text from database API and renders progressively
+ * @param {number} messageId - Database message ID
+ * @param {number} batchSize - Characters per batch (default: 2)
+ * @param {number} batchDelay - Milliseconds between batches (default: 30)
+ */
+window.typewriterFromDatabase = async function(messageId, batchSize = 2, batchDelay = 30) {
+    console.log('typewriterFromDatabase called with messageId:', messageId);
+    
+    // Find the last message text element
+    const messageTexts = document.querySelectorAll('.message-text');
+    if (!messageTexts.length) {
+        console.warn('No message text elements found');
+        return;
+    }
+    
+    const element = messageTexts[messageTexts.length - 1];
+    console.log('Found message element, current text length:', element.textContent.length);
+    
+    try {
+        // Fetch text from API
+        console.log('Fetching from /api/chat/message/' + messageId);
+        const response = await fetch(`/api/chat/message/${messageId}`);
+        
+        if (!response.ok) {
+            console.warn('Failed to fetch message text:', response.status);
+            return;
+        }
+        
+        const data = await response.json();
+        const text = data.text;
+        
+        if (!text) {
+            console.warn('No text in response');
+            return;
+        }
+        
+        console.log('Starting typewriter effect');
+        console.log('Text length:', text.length);
+        console.log('Batch size:', batchSize, 'Batch delay:', batchDelay);
+        
+        // Clear element
+        element.textContent = '';
+        element.innerHTML = '';
+        
+        let currentIndex = 0;
+        let isCancelled = false;
+        
+        const renderNextBatch = () => {
+            if (isCancelled || currentIndex >= text.length) {
+                console.log('Typewriter complete. Rendered:', currentIndex, 'chars');
+                return;
+            }
+            
+            // Render batch
+            const endIndex = Math.min(currentIndex + batchSize, text.length);
+            const batch = text.substring(currentIndex, endIndex);
+            element.textContent += batch;
+            currentIndex = endIndex;
+            
+            // Scroll parent to bottom
+            const parent = element.closest('.chat-messages') || element.closest('.message-wrapper');
+            if (parent) {
+                parent.scrollTop = parent.scrollHeight;
+            }
+            
+            setTimeout(renderNextBatch, batchDelay);
+        };
+        
+        renderNextBatch();
+        
+        return () => {
+            isCancelled = true;
+        };
+    } catch (error) {
+        console.error('Typewriter effect error:', error);
+    }
+};
+
+/**
+ * Typewriter effect for last message - auto-detects
+ */
+window.typewriterLastMessage = function(batchSize = 2, batchDelay = 30) {
+    const messageTexts = document.querySelectorAll('.message-text');
+    if (!messageTexts.length) {
+        console.warn('No message text elements found');
+        return;
+    }
+    
+    const lastElement = messageTexts[messageTexts.length - 1];
+    console.log('Starting typewriter on last message element');
+    return window.startTypewriter(lastElement, batchSize, batchDelay);
+};

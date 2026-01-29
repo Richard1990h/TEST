@@ -1,0 +1,1010 @@
+@page "/"
+@inject UserSessionService Session
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject HttpClient Http
+@implements IAsyncDisposable
+@using Microsoft.AspNetCore.SignalR.Client
+@using LittleHelperAI.Dashboard.Pages.Workbench
+@using LittleHelperAI.Dashboard.Shared
+@using System.Text
+@using System.Text.RegularExpressions
+
+<PageTitle>AI Assistant - Chat</PageTitle>
+
+@if (Session.IsLoggedIn())
+{
+    <div class="main-content-wrapper @(showWorkbench ? (chatCollapsed ? "chat-collapsed" : "with-workbench") : "")">
+        @if (!chatCollapsed)
+        {
+            <ChatArea @ref="chatArea"
+                      OnMessageSent="HandleMessageSent"
+                      OnStopRequested="HandleStopRequested"
+                      ActivePipelineName="@activePipelineName"
+                      IsPrimaryPipeline="@isPrimaryPipeline"
+                      ActivePipelineSteps="@pipelineSteps"
+                      PipelineErrors="@pipelineErrors"
+                      PipelineWarnings="@pipelineWarnings" />
+        }
+
+        @* Workbench Toggle Button - show when files exist but workbench is closed *@
+        @if (projectFiles.Any() && !showWorkbench)
+        {
+            <button class="workbench-toggle-btn" @onclick="OpenWorkbenchFromButton" title="Show Workbench">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="16 18 22 12 16 6"></polyline>
+                    <polyline points="8 6 2 12 8 18"></polyline>
+                </svg>
+                <span class="file-badge">@projectFiles.Count</span>
+            </button>
+        }
+    </div>
+
+    <WorkbenchPanel @ref="workbench"
+                    IsOpen="@showWorkbench"
+                    IsChatCollapsed="@chatCollapsed"
+                    Files="@projectFiles"
+                    PreviewUrl="@previewUrl"
+                    OnClose="HandleWorkbenchClose"
+                    OnToggleChatCollapse="ToggleChatCollapse"
+                    OnRunProject="HandleRunProject"
+                    OnRefreshPreview="HandleRunProject"
+                    OnDownloadProject="HandleDownloadProject"
+                    OnErrorReported="HandleErrorReported" />
+}
+else
+{
+    @if (!showRegisterForm)
+    {
+        <LoginForm OnLoginSuccess="RefreshSession" />
+    }
+    else
+    {
+        <RegisterForm OnRegisterSuccess="RefreshSession" />
+    }
+}
+
+<style>
+    .main-content-wrapper {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0; /* Critical for flex children to scroll */
+        overflow: hidden; /* Prevent any overflow from this container */
+        transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .main-content-wrapper.with-workbench {
+        margin-right: min(50%, 800px);
+    }
+
+    .main-content-wrapper.chat-collapsed {
+        /* Chat is hidden, workbench takes full width */
+        margin-right: 0;
+        width: 0;
+        overflow: hidden;
+    }
+
+    .workbench-toggle-btn {
+        position: fixed;
+        right: 1rem;
+        bottom: 6rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 48px;
+        height: 48px;
+        background: var(--accent-color, #6366f1);
+        border: none;
+        border-radius: 12px;
+        color: white;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        transition: all 0.2s;
+        z-index: 50;
+    }
+
+    .workbench-toggle-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+    }
+
+    .workbench-toggle-btn svg {
+        width: 24px;
+        height: 24px;
+    }
+
+    .file-badge {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        background: #ef4444;
+        color: white;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 2px 6px;
+        border-radius: 10px;
+        min-width: 18px;
+        text-align: center;
+    }
+
+    @@media (max-width: 900px) {
+        .main-content-wrapper.with-workbench {
+            margin-right: 0;
+        }
+    }
+</style>
+
+@code {
+    [CascadingParameter] private MainLayout? Layout { get; set; }
+
+    private bool showRegisterForm = false;
+    private ChatArea? chatArea;
+    private WorkbenchPanel? workbench;
+    private HubConnection? hubConnection;
+    private int? currentChatId;
+
+    // Workbench state
+    private bool showWorkbench = false;
+    private bool chatCollapsed = false;
+    private List<ProjectFile> projectFiles = new();
+    private string? previewUrl = null;
+    private StringBuilder currentResponseBuffer = new();
+
+    // Pipeline state
+    private string? activePipelineName = null;
+    private bool isPrimaryPipeline = true;
+    private List<ChatArea.PipelineStepInfo> pipelineSteps = new();
+    private List<string> pipelineErrors = new();
+    private List<string> pipelineWarnings = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Session.IsLoggedIn())
+        {
+            await InitializeHubConnection();
+            await LoadActivePipeline();
+            // Don't load existing files - File Explorer starts empty
+            // Files appear when AI creates them via tools
+            // await LoadProjectFiles();
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Subscribe to workspace toggle from MainLayout header button
+        if (Layout != null)
+        {
+            Layout.OnWorkspaceToggled -= HandleWorkspaceToggled;
+            Layout.OnWorkspaceToggled += HandleWorkspaceToggled;
+        }
+    }
+
+    private void HandleWorkspaceToggled()
+    {
+        showWorkbench = Layout?.IsWorkspaceOpen ?? false;
+        if (!showWorkbench)
+        {
+            chatCollapsed = false; // Restore chat when workspace closes
+        }
+        StateHasChanged();
+    }
+
+    private void HandleWorkbenchClose()
+    {
+        showWorkbench = false;
+        chatCollapsed = false;
+        Layout?.SetWorkspaceOpen(false);
+    }
+
+    private void ToggleChatCollapse()
+    {
+        chatCollapsed = !chatCollapsed;
+    }
+
+    private void OpenWorkbenchFromButton()
+    {
+        showWorkbench = true;
+        Layout?.SetWorkspaceOpen(true);
+    }
+
+    private async Task LoadProjectFiles()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<ProjectFilesResponse>("api/projectfiles");
+            if (response?.Files != null && response.Files.Any())
+            {
+                projectFiles.Clear();
+                LoadFilesFromTree(response.Files);
+                if (projectFiles.Any())
+                {
+                    showWorkbench = true;
+                }
+                Console.WriteLine($"[Index] Loaded {projectFiles.Count} project files from server");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Index] Failed to load project files: {ex.Message}");
+        }
+    }
+
+    private void LoadFilesFromTree(List<FileTreeNode> nodes)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.IsDirectory && node.Children != null)
+            {
+                LoadFilesFromTree(node.Children);
+            }
+            else if (!node.IsDirectory)
+            {
+                projectFiles.Add(new ProjectFile
+                {
+                    Path = node.Path,
+                    Content = "", // Content loaded on demand
+                    IsModified = false
+                });
+            }
+        }
+    }
+
+    public class ProjectFilesResponse
+    {
+        public string BaseDirectory { get; set; } = "";
+        public List<FileTreeNode> Files { get; set; } = new();
+    }
+
+    public class FileTreeNode
+    {
+        public string Name { get; set; } = "";
+        public string Path { get; set; } = "";
+        public bool IsDirectory { get; set; }
+        public long Size { get; set; }
+        public DateTime LastModified { get; set; }
+        public List<FileTreeNode>? Children { get; set; }
+    }
+
+    private async Task LoadActivePipeline()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PipelineInfoResponse>("api/pipelines/primary");
+            if (response != null)
+            {
+                activePipelineName = response.Name;
+                isPrimaryPipeline = true;
+
+                // Load pipeline steps
+                if (response.Steps != null && response.Steps.Any())
+                {
+                    pipelineSteps = response.Steps
+                        .OrderBy(s => s.Order)
+                        .Select(s => new ChatArea.PipelineStepInfo
+                        {
+                            Id = s.Id,
+                            Name = GetStepDisplayName(s),
+                            IsActive = false,
+                            IsComplete = false
+                        })
+                        .ToList();
+                }
+            }
+        }
+        catch
+        {
+            activePipelineName = "King Pipeline"; // Fallback
+            isPrimaryPipeline = true;
+            // Create default steps for King Pipeline
+            pipelineSteps = GetDefaultPipelineSteps();
+        }
+    }
+
+    private string GetStepDisplayName(PipelineStepDto step)
+    {
+        // Use description if available, otherwise format the type
+        if (!string.IsNullOrWhiteSpace(step.Description))
+        {
+            // Shorten long descriptions
+            return step.Description.Length > 30
+                ? step.Description.Substring(0, 27) + "..."
+                : step.Description;
+        }
+
+        // Format type like "inject.core-prompt" to "Core Prompt"
+        var typeParts = step.Type.Split('.');
+        var lastPart = typeParts.Last().Replace("-", " ");
+        return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(lastPart);
+    }
+
+    private List<ChatArea.PipelineStepInfo> GetDefaultPipelineSteps()
+    {
+        return new List<ChatArea.PipelineStepInfo>
+        {
+            new() { Id = "load-memory", Name = "Load Memory" },
+            new() { Id = "inject-core", Name = "Core Prompt" },
+            new() { Id = "inject-tools", Name = "Tools" },
+            new() { Id = "inject-project", Name = "Project Context" },
+            new() { Id = "inject-conversation", Name = "Conversation" },
+            new() { Id = "analyze-intent", Name = "Analyze Intent" },
+            new() { Id = "llm-stream", Name = "LLM Generate" },
+            new() { Id = "tool-loop", Name = "Tool Execution" },
+            new() { Id = "validate-output", Name = "Validation" },
+            new() { Id = "save-memory", Name = "Save Memory" }
+        };
+    }
+
+    private void SetActiveStep(string stepId)
+    {
+        foreach (var step in pipelineSteps)
+        {
+            // If this step was active, mark it complete
+            if (step.IsActive && step.Id != stepId)
+            {
+                step.IsActive = false;
+                step.IsComplete = true;
+            }
+            // Set the new active step
+            step.IsActive = step.Id == stepId;
+        }
+    }
+
+    private void CompleteStep(string stepId)
+    {
+        var step = pipelineSteps.FirstOrDefault(s => s.Id == stepId);
+        if (step != null)
+        {
+            step.IsActive = false;
+            step.IsComplete = true;
+        }
+    }
+
+    private void ResetPipelineSteps()
+    {
+        foreach (var step in pipelineSteps)
+        {
+            step.IsActive = false;
+            step.IsComplete = false;
+            step.Errors.Clear();
+            step.Warnings.Clear();
+        }
+        pipelineErrors.Clear();
+        pipelineWarnings.Clear();
+    }
+
+    private string? MapStatusToStep(string status)
+    {
+        var lowerStatus = status.ToLowerInvariant();
+
+        // Map common status messages to step IDs
+        if (lowerStatus.Contains("memory") && lowerStatus.Contains("load"))
+            return "load-memory";
+        if (lowerStatus.Contains("core") || lowerStatus.Contains("system prompt"))
+            return "inject-core";
+        if (lowerStatus.Contains("tool") && (lowerStatus.Contains("inject") || lowerStatus.Contains("prompt")))
+            return "inject-tools";
+        if (lowerStatus.Contains("project") || lowerStatus.Contains("context"))
+            return "inject-project";
+        if (lowerStatus.Contains("conversation") || lowerStatus.Contains("history"))
+            return "inject-conversation";
+        if (lowerStatus.Contains("intent") || lowerStatus.Contains("analyz"))
+            return "analyze-intent";
+        if (lowerStatus.Contains("generat") || lowerStatus.Contains("stream") || lowerStatus.Contains("llm") || lowerStatus.Contains("thinking"))
+            return "llm-stream";
+        if (lowerStatus.Contains("tool") && (lowerStatus.Contains("execut") || lowerStatus.Contains("run") || lowerStatus.Contains("call")))
+            return "tool-loop";
+        if (lowerStatus.Contains("validat") || lowerStatus.Contains("check"))
+            return "validate-output";
+        if (lowerStatus.Contains("memory") && lowerStatus.Contains("sav"))
+            return "save-memory";
+        if (lowerStatus.Contains("process"))
+            return "inject-core"; // Default to first real step when "processing"
+
+        return null;
+    }
+
+    public class PipelineInfoResponse
+    {
+        public string? Id { get; set; }
+        public string Name { get; set; } = "";
+        public List<PipelineStepDto>? Steps { get; set; }
+    }
+
+    public class PipelineStepDto
+    {
+        public string Id { get; set; } = "";
+        public string Type { get; set; } = "";
+        public string? Description { get; set; }
+        public int Order { get; set; }
+    }
+
+    private async Task InitializeHubConnection()
+    {
+        var backendUrl = "http://localhost:8648";
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl($"{backendUrl}/hubs/chat")
+            .WithAutomaticReconnect()
+            .Build();
+
+        // Handle streaming tokens
+        hubConnection.On<string>("ReceiveToken", (token) =>
+        {
+            chatArea?.AppendToResponse(token);
+            currentResponseBuffer.Append(token);
+
+            // First token means we're in LLM generation phase
+            if (currentResponseBuffer.Length == token.Length)
+            {
+                SetActiveStep("llm-stream");
+            }
+
+            InvokeAsync(StateHasChanged);
+        });
+
+        // Handle status updates
+        hubConnection.On<string>("ReceiveStatus", (status) =>
+        {
+            chatArea?.UpdateStatus(status);
+
+            // Map status messages to pipeline steps
+            var stepId = MapStatusToStep(status);
+            if (!string.IsNullOrEmpty(stepId))
+            {
+                SetActiveStep(stepId);
+            }
+
+            InvokeAsync(StateHasChanged);
+        });
+
+        // Handle tool calls
+        hubConnection.On<string>("ReceiveToolCall", (toolCall) =>
+        {
+            chatArea?.AddAction("tool", toolCall, ChatArea.ActionStatus.Running);
+            SetActiveStep("tool-loop");
+            InvokeAsync(StateHasChanged);
+        });
+
+        // Handle tool results
+        hubConnection.On<string>("ReceiveToolResult", (result) =>
+        {
+            chatArea?.UpdateActionStatus("tool", ChatArea.ActionStatus.Complete);
+            InvokeAsync(StateHasChanged);
+        });
+
+        // Handle chat ID
+        hubConnection.On<int>("ReceiveChatId", (chatId) =>
+        {
+            currentChatId = chatId;
+            Console.WriteLine($"[Index] Received ChatId: {chatId}");
+        });
+
+        // Handle completion
+        hubConnection.On<object>("ReceiveComplete", (data) =>
+        {
+            chatArea?.CompleteResponse();
+
+            // Mark all pipeline steps as complete
+            foreach (var step in pipelineSteps)
+            {
+                step.IsActive = false;
+                step.IsComplete = true;
+            }
+
+            // Parse the response for files
+            var fullResponse = currentResponseBuffer.ToString();
+            var parsedFiles = ParseFilesFromResponse(fullResponse);
+            if (parsedFiles.Any())
+            {
+                foreach (var file in parsedFiles)
+                {
+                    AddOrUpdateFile(file);
+                }
+                showWorkbench = true;
+            }
+            currentResponseBuffer.Clear();
+
+            InvokeAsync(StateHasChanged);
+            Console.WriteLine($"[Index] Generation complete, found {parsedFiles.Count} files");
+        });
+
+        // Handle errors
+        hubConnection.On<string>("ReceiveError", (error) =>
+        {
+            chatArea?.ShowError(error);
+            ResetPipelineSteps();
+            InvokeAsync(StateHasChanged);
+            Console.WriteLine($"[Index] Error: {error}");
+        });
+
+        // Handle pipeline step started
+        hubConnection.On<string>("ReceivePipelineStep", (stepId) =>
+        {
+            SetActiveStep(stepId);
+            InvokeAsync(StateHasChanged);
+            Console.WriteLine($"[Index] Pipeline step: {stepId}");
+        });
+
+        // Handle pipeline step completed
+        hubConnection.On<string>("ReceiveStepComplete", (stepId) =>
+        {
+            CompleteStep(stepId);
+            InvokeAsync(StateHasChanged);
+            Console.WriteLine($"[Index] Step complete: {stepId}");
+        });
+
+        // Handle pipeline reset (when starting a new message)
+        hubConnection.On("ReceivePipelineReset", () =>
+        {
+            ResetPipelineSteps();
+            InvokeAsync(StateHasChanged);
+        });
+
+        // Handle pipeline errors
+        hubConnection.On<string, string>("ReceivePipelineError", (stepId, error) =>
+        {
+            if (!string.IsNullOrEmpty(stepId))
+            {
+                var step = pipelineSteps.FirstOrDefault(s => s.Id == stepId);
+                if (step != null)
+                {
+                    step.Errors.Add(error);
+                }
+            }
+            else
+            {
+                pipelineErrors.Add(error);
+            }
+            InvokeAsync(StateHasChanged);
+            Console.WriteLine($"[Index] Pipeline error: {error}");
+        });
+
+        // Handle pipeline warnings
+        hubConnection.On<string, string>("ReceivePipelineWarning", (stepId, warning) =>
+        {
+            if (!string.IsNullOrEmpty(stepId))
+            {
+                var step = pipelineSteps.FirstOrDefault(s => s.Id == stepId);
+                if (step != null)
+                {
+                    step.Warnings.Add(warning);
+                }
+            }
+            else
+            {
+                pipelineWarnings.Add(warning);
+            }
+            InvokeAsync(StateHasChanged);
+            Console.WriteLine($"[Index] Pipeline warning: {warning}");
+        });
+
+        // Handle file created events from backend tool execution
+        hubConnection.On<FileEventData>("ReceiveFileCreated", async (data) =>
+        {
+            Console.WriteLine($"[Index] File created: {data.Path}");
+            AddOrUpdateFile(new ProjectFile
+            {
+                Path = data.Path,
+                Content = data.Content ?? "",
+                IsModified = false
+            });
+            showWorkbench = true;
+            await InvokeAsync(StateHasChanged);
+        });
+
+        // Handle file updated events
+        hubConnection.On<FileEventData>("ReceiveFileUpdated", async (data) =>
+        {
+            Console.WriteLine($"[Index] File updated: {data.Path}");
+            var existing = projectFiles.FirstOrDefault(f => f.Path == data.Path);
+            if (existing != null)
+            {
+                existing.Content = data.Content ?? "";
+                existing.IsModified = true;
+            }
+            else
+            {
+                AddOrUpdateFile(new ProjectFile
+                {
+                    Path = data.Path,
+                    Content = data.Content ?? "",
+                    IsModified = true
+                });
+            }
+            showWorkbench = true;
+            await InvokeAsync(StateHasChanged);
+        });
+
+        // Handle file deleted events
+        hubConnection.On<FileEventData>("ReceiveFileDeleted", async (data) =>
+        {
+            Console.WriteLine($"[Index] File deleted: {data.Path}");
+            var existing = projectFiles.FirstOrDefault(f => f.Path == data.Path);
+            if (existing != null)
+            {
+                projectFiles.Remove(existing);
+            }
+            await InvokeAsync(StateHasChanged);
+        });
+
+        // Handle directory created events
+        hubConnection.On<FileEventData>("ReceiveDirectoryCreated", (data) =>
+        {
+            Console.WriteLine($"[Index] Directory created: {data.Path}");
+            // Directory creation is handled implicitly when files are created
+            InvokeAsync(StateHasChanged);
+        });
+
+        try
+        {
+            await hubConnection.StartAsync();
+            Console.WriteLine("[Index] SignalR connected");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Index] SignalR connection failed: {ex.Message}");
+        }
+    }
+
+    public class FileEventData
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("path")]
+        public string Path { get; set; } = "";
+
+        [System.Text.Json.Serialization.JsonPropertyName("content")]
+        public string? Content { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("timestamp")]
+        public DateTime Timestamp { get; set; }
+    }
+
+    private async Task RefreshSession()
+    {
+        await Task.CompletedTask;
+        showRegisterForm = false;
+
+        if (Session.IsLoggedIn() && hubConnection == null)
+        {
+            await InitializeHubConnection();
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task HandleMessageSent(ChatArea.MessagePayload payload)
+    {
+        Console.WriteLine($"[Index] Message received: {payload.Message}");
+        Console.WriteLine($"[Index] Files attached: {payload.Files.Count}");
+
+        if (hubConnection?.State != HubConnectionState.Connected)
+        {
+            chatArea?.ShowError("Not connected to server. Please refresh the page.");
+            return;
+        }
+
+        // Reset pipeline steps for new message and set first step active
+        ResetPipelineSteps();
+        if (pipelineSteps.Any())
+        {
+            pipelineSteps.First().IsActive = true;
+        }
+
+        // ChatArea already adds the user message, just start assistant response
+        chatArea?.StartAssistantResponse();
+        chatArea?.UpdateStatus("Processing your request...");
+
+        try
+        {
+            var request = new
+            {
+                UserId = Session.GetUser()?.Id ?? 0,
+                Message = payload.Message,
+                Files = payload.Files.Select(f => new { f.Name, f.Content }).ToList(),
+                ChatId = currentChatId,
+                CreateNewChat = currentChatId == null
+            };
+
+            await hubConnection.InvokeAsync("SendMessage", request);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Index] SendMessage error: {ex.Message}");
+            chatArea?.ShowError($"Failed to send message: {ex.Message}");
+        }
+    }
+
+    private async Task HandleStopRequested()
+    {
+        if (hubConnection?.State == HubConnectionState.Connected)
+        {
+            try
+            {
+                await hubConnection.InvokeAsync("StopGeneration");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Index] StopGeneration error: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task HandleRunProject()
+    {
+        workbench?.AddTerminalLine("Starting project preview...");
+
+        // Find an HTML file to preview
+        var htmlFile = projectFiles.FirstOrDefault(f => f.Path.EndsWith(".html", StringComparison.OrdinalIgnoreCase));
+        if (htmlFile == null)
+        {
+            workbench?.AddTerminalLine("No HTML file found for preview", isError: true);
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        var htmlContent = htmlFile.Content;
+
+        // Inline JavaScript files referenced in the HTML
+        foreach (var jsFile in projectFiles.Where(f => f.Path.EndsWith(".js", StringComparison.OrdinalIgnoreCase)))
+        {
+            var fileName = System.IO.Path.GetFileName(jsFile.Path);
+            // Replace <script src="filename.js"></script> with inline script
+            var scriptPattern = $"<script\\s+src=[\"']{System.Text.RegularExpressions.Regex.Escape(fileName)}[\"']\\s*>\\s*</script>";
+            var replacement = $"<script>\n{jsFile.Content}\n</script>";
+            htmlContent = System.Text.RegularExpressions.Regex.Replace(htmlContent, scriptPattern, replacement, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            // Also try with path variations like ./filename.js
+            var scriptPatternWithPath = $"<script\\s+src=[\"']\\./?" + System.Text.RegularExpressions.Regex.Escape(fileName) + "[\"']\\s*>\\s*</script>";
+            htmlContent = System.Text.RegularExpressions.Regex.Replace(htmlContent, scriptPatternWithPath, replacement, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+
+        // Inline CSS files referenced in the HTML
+        foreach (var cssFile in projectFiles.Where(f => f.Path.EndsWith(".css", StringComparison.OrdinalIgnoreCase)))
+        {
+            var fileName = System.IO.Path.GetFileName(cssFile.Path);
+            // Replace <link rel="stylesheet" href="filename.css"> with inline style
+            var linkPattern = $"<link[^>]*href=[\"']{System.Text.RegularExpressions.Regex.Escape(fileName)}[\"'][^>]*>";
+            var replacement = $"<style>\n{cssFile.Content}\n</style>";
+            htmlContent = System.Text.RegularExpressions.Regex.Replace(htmlContent, linkPattern, replacement, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            // Also try with path variations
+            var linkPatternWithPath = $"<link[^>]*href=[\"']\\./?" + System.Text.RegularExpressions.Regex.Escape(fileName) + "[\"'][^>]*>";
+            htmlContent = System.Text.RegularExpressions.Regex.Replace(htmlContent, linkPatternWithPath, replacement, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+
+        // Create data URL with the inlined content
+        var base64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(htmlContent));
+        previewUrl = $"data:text/html;base64,{base64}";
+        workbench?.AddTerminalLine($"Preview ready: {htmlFile.Path}");
+        workbench?.AddTerminalLine($"Inlined {projectFiles.Count(f => f.Path.EndsWith(".js", StringComparison.OrdinalIgnoreCase))} JS and {projectFiles.Count(f => f.Path.EndsWith(".css", StringComparison.OrdinalIgnoreCase))} CSS files");
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleDownloadProject()
+    {
+        if (!projectFiles.Any())
+        {
+            return;
+        }
+
+        workbench?.AddTerminalLine("Preparing download...");
+
+        // Create a simple text-based download with all files
+        var content = new StringBuilder();
+        content.AppendLine("=== PROJECT FILES ===");
+        content.AppendLine();
+
+        foreach (var file in projectFiles)
+        {
+            content.AppendLine($"=== {file.Path} ===");
+            content.AppendLine(file.Content);
+            content.AppendLine();
+        }
+
+        // Trigger download via JS
+        var bytes = System.Text.Encoding.UTF8.GetBytes(content.ToString());
+        var base64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("downloadFile", "project-files.txt", base64, "text/plain");
+
+        workbench?.AddTerminalLine("Download complete!");
+    }
+
+    private async Task HandleErrorReported(WorkbenchPanel.ErrorInfo errorInfo)
+    {
+        if (hubConnection == null || hubConnection.State != HubConnectionState.Connected)
+        {
+            workbench?.AddTerminalLine("Cannot report error: Not connected to server", isError: true);
+            return;
+        }
+
+        if (!currentChatId.HasValue || currentChatId.Value <= 0)
+        {
+            workbench?.AddTerminalLine("Cannot report error: No active chat", isError: true);
+            return;
+        }
+
+        try
+        {
+            // Send error to ChatHub
+            await hubConnection.InvokeAsync("ReportError", new
+            {
+                UserId = Session.GetUser()?.Id ?? 0,
+                ChatId = currentChatId.Value,
+                ErrorType = errorInfo.ErrorType,
+                Message = errorInfo.Message,
+                StackTrace = errorInfo.StackTrace,
+                FilePath = errorInfo.FilePath,
+                LineNumber = errorInfo.LineNumber
+            });
+
+            workbench?.AddTerminalLine("Error sent to AI - generating fix...");
+        }
+        catch (Exception ex)
+        {
+            workbench?.AddTerminalLine($"Failed to report error: {ex.Message}", isError: true);
+        }
+    }
+
+    private void AddOrUpdateFile(ProjectFile file)
+    {
+        var existing = projectFiles.FirstOrDefault(f => f.Path == file.Path);
+        if (existing != null)
+        {
+            existing.Content = file.Content;
+            existing.IsModified = true;
+        }
+        else
+        {
+            projectFiles.Add(file);
+        }
+    }
+
+    /// <summary>
+    /// Parse AI response for code blocks with file paths.
+    /// Supports: tool calls, code blocks with filenames, artifact tags
+    /// </summary>
+    private List<ProjectFile> ParseFilesFromResponse(string response)
+    {
+        var files = new List<ProjectFile>();
+
+        // Pattern 0: Tool calls - ```tool { "tool": "write_file", "arguments": { "path": "...", "content": "..." } }
+        // This is the PRIMARY pattern we expect from the AI
+        var toolPattern = @"```tool\s*\n?\s*\{[^}]*""tool""\s*:\s*""write_file""[^}]*""arguments""\s*:\s*\{[^}]*""path""\s*:\s*""([^""]+)""[^}]*""content""\s*:\s*""((?:[^""\\]|\\.)*)""";
+        var toolMatches = Regex.Matches(response, toolPattern, RegexOptions.Singleline);
+
+        foreach (Match match in toolMatches)
+        {
+            var filename = match.Groups[1].Value.Trim();
+            var content = match.Groups[2].Value;
+
+            // Unescape the content
+            content = content
+                .Replace("\\n", "\n")
+                .Replace("\\t", "\t")
+                .Replace("\\\"", "\"")
+                .Replace("\\\\", "\\");
+
+            if (!files.Any(f => f.Path == filename) && !string.IsNullOrWhiteSpace(filename))
+            {
+                files.Add(new ProjectFile
+                {
+                    Path = filename,
+                    Content = content.Trim()
+                });
+            }
+        }
+
+        // Also try JSON parsing for tool blocks (more robust)
+        var toolBlockPattern = @"```tool\s*\n([\s\S]*?)```";
+        var toolBlockMatches = Regex.Matches(response, toolBlockPattern, RegexOptions.Multiline);
+
+        foreach (Match match in toolBlockMatches)
+        {
+            try
+            {
+                var json = match.Groups[1].Value.Trim();
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("tool", out var toolProp) &&
+                    toolProp.GetString() == "write_file" &&
+                    root.TryGetProperty("arguments", out var argsProp))
+                {
+                    if (argsProp.TryGetProperty("path", out var pathProp) &&
+                        argsProp.TryGetProperty("content", out var contentProp))
+                    {
+                        var filename = pathProp.GetString() ?? "";
+                        var content = contentProp.GetString() ?? "";
+
+                        if (!files.Any(f => f.Path == filename) && !string.IsNullOrWhiteSpace(filename))
+                        {
+                            files.Add(new ProjectFile
+                            {
+                                Path = filename,
+                                Content = content
+                            });
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // JSON parsing failed, skip this block
+            }
+        }
+
+        // Pattern 1: Code blocks with filename - ```filename.ext or ```lang filename.ext
+        var codeBlockPattern = @"```(?:(\w+)\s+)?([a-zA-Z0-9_\-./\\]+\.\w+)\s*\n([\s\S]*?)```";
+        var matches = Regex.Matches(response, codeBlockPattern, RegexOptions.Multiline);
+
+        foreach (Match match in matches)
+        {
+            var language = match.Groups[1].Value;
+            var filename = match.Groups[2].Value.Trim();
+            var content = match.Groups[3].Value;
+
+            // Skip if it looks like a tool block
+            if (language == "tool" || filename.Contains("tool"))
+                continue;
+
+            if (!files.Any(f => f.Path == filename) && !string.IsNullOrWhiteSpace(filename) && !string.IsNullOrWhiteSpace(content))
+            {
+                files.Add(new ProjectFile
+                {
+                    Path = filename,
+                    Content = content.Trim()
+                });
+            }
+        }
+
+        // Pattern 2: Code blocks with file comment at start - ```lang\n// filename.ext or <!-- filename.ext -->
+        var codeBlockWithCommentPattern = @"```(\w+)\s*\n\s*(?://|<!--|#|/\*)\s*([a-zA-Z0-9_\-./\\]+\.\w+)(?:\s*-->|\s*\*/|)\s*\n([\s\S]*?)```";
+        var commentMatches = Regex.Matches(response, codeBlockWithCommentPattern, RegexOptions.Multiline);
+
+        foreach (Match match in commentMatches)
+        {
+            var filename = match.Groups[2].Value.Trim();
+            var content = match.Groups[3].Value;
+
+            // Avoid duplicates
+            if (!files.Any(f => f.Path == filename) && !string.IsNullOrWhiteSpace(filename))
+            {
+                files.Add(new ProjectFile
+                {
+                    Path = filename,
+                    Content = content.Trim()
+                });
+            }
+        }
+
+        // Pattern 3: Artifact-style tags (like bolt.new uses) - <file path="filename.ext">...</file>
+        var artifactPattern = @"<file\s+path=""([^""]+)""[^>]*>([\s\S]*?)</file>";
+        var artifactMatches = Regex.Matches(response, artifactPattern, RegexOptions.Multiline);
+
+        foreach (Match match in artifactMatches)
+        {
+            var filename = match.Groups[1].Value.Trim();
+            var content = match.Groups[2].Value;
+
+            if (!files.Any(f => f.Path == filename) && !string.IsNullOrWhiteSpace(filename))
+            {
+                files.Add(new ProjectFile
+                {
+                    Path = filename,
+                    Content = content.Trim()
+                });
+            }
+        }
+
+        return files;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
