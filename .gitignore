@@ -1,2 +1,8 @@
 nul
 .env
+
+# Cloud bridge (Tools/CloudBridge): secrets and runtime files stay out of the repo
+Tools/CloudBridge/config.yml
+Tools/CloudBridge/*.key
+Tools/CloudBridge/*.log
+Tools/CloudBridge/__pycache__/

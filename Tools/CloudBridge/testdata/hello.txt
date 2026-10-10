@@ -1,0 +1,5 @@
+Hello from the owner's PC.
+
+If you can read this from a claude.ai/code session, the chain
+cloud -> Cloudflare Access -> Cloudflare Tunnel -> cloudflared -> test_echo_server.py
+works end to end. Nothing on the PC listens on the internet.

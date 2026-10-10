@@ -1,0 +1,17 @@
+# cloudflared config for the Phase 1 test tunnel.
+# Copy to Tools/CloudBridge/config.yml (git-ignored) and fill in the two placeholders.
+# The credentials JSON lives OUTSIDE the repo (cloudflared tunnel create puts it in %USERPROFILE%\.cloudflared).
+
+tunnel: <TUNNEL_UUID>                                          # printed by: cloudflared tunnel create lo-bridge-test
+credentials-file: C:\Users\<you>\.cloudflared\<TUNNEL_UUID>.json
+
+# cloudflared makes an OUTBOUND connection to Cloudflare; the PC opens no port.
+ingress:
+  - hostname: bridge-test.<domain>                             # must be a zone on Cloudflare DNS
+    service: http://127.0.0.1:30201                            # test_echo_server.py
+    originRequest:
+      connectTimeout: 30s
+      noHappyEyeballs: true
+  - service: http_status:404                                   # everything else
+
+# Phase 2 (real gateway) uses a second tunnel "lo-bridge" -> bridge.<domain> -> http://127.0.0.1:30200
